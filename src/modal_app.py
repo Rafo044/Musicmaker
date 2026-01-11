@@ -30,7 +30,7 @@ volume = modal.Volume.from_name("diffrhythm-models", create_if_missing=True)
 
 
 @app.cls(
-    gpu="A10G",  # 24GB VRAM - kifayət edir
+    gpu="A10G",  # 24GB VRAM
     image=image,
     volumes={"/models": volume},
     timeout=600,
@@ -39,40 +39,41 @@ volume = modal.Volume.from_name("diffrhythm-models", create_if_missing=True)
 class DiffRhythmGenerator:
     """DiffRhythm model wrapper for lyrics-to-song generation."""
     
-    @modal.build()
-    def download_models(self):
-        """Download DiffRhythm models during image build."""
-        from huggingface_hub import snapshot_download
-        
-        print("📥 Downloading DiffRhythm models...")
-        
-        # Download DiffRhythm-base model
-        snapshot_download(
-            repo_id="ASLP-lab/DiffRhythm-base",
-            local_dir="/models/diffrhythm-base",
-            ignore_patterns=["*.md", "*.txt"],
-        )
-        
-        # Download VAE model
-        snapshot_download(
-            repo_id="ASLP-lab/DiffRhythm-vae",
-            local_dir="/models/diffrhythm-vae",
-            ignore_patterns=["*.md", "*.txt"],
-        )
-        
-        print("✅ Models downloaded")
-    
     @modal.enter()
     def load_model(self):
-        """Load model on container startup."""
+        """Load/download model on container startup."""
+        from huggingface_hub import snapshot_download
+        from pathlib import Path
         import sys
+        
         sys.path.append("/root/DiffRhythm")
         
         print("🎵 Loading DiffRhythm model...")
         
-        # Model will be loaded by inference script
-        self.model_path = "/models/diffrhythm-base"
-        self.vae_path = "/models/diffrhythm-vae"
+        # Model paths in volume
+        self.model_base_path = Path("/models/diffrhythm-base")
+        self.model_vae_path = Path("/models/diffrhythm-vae")
+        
+        # Download models if not exists
+        if not self.model_base_path.exists():
+            print("📥 Downloading DiffRhythm-base model...")
+            snapshot_download(
+                repo_id="ASLP-lab/DiffRhythm-base",
+                local_dir=str(self.model_base_path),
+                ignore_patterns=["*.md", "*.txt"],
+            )
+            volume.commit()  # Save to volume
+            print("✅ DiffRhythm-base downloaded")
+        
+        if not self.model_vae_path.exists():
+            print("📥 Downloading DiffRhythm-vae model...")
+            snapshot_download(
+                repo_id="ASLP-lab/DiffRhythm-vae",
+                local_dir=str(self.model_vae_path),
+                ignore_patterns=["*.md", "*.txt"],
+            )
+            volume.commit()  # Save to volume
+            print("✅ DiffRhythm-vae downloaded")
         
         print("✅ DiffRhythm ready")
     
@@ -87,7 +88,7 @@ class DiffRhythmGenerator:
         Generate full song from lyrics.
         
         Args:
-            lyrics: Song lyrics with timestamps (optional)
+            lyrics: Song lyrics with timestamps (LRC format)
             genre: Music genre/style
             duration: Song duration (95 or 285 seconds)
             
@@ -112,12 +113,9 @@ class DiffRhythmGenerator:
             with open(lyrics_file, "w", encoding="utf-8") as f:
                 f.write(lyrics)
             
-            # Output file
-            output_file = tmpdir / "output.wav"
-            
             # Run DiffRhythm inference
             cmd = [
-                "python", "/root/DiffRhythm/infer/infer.py",
+                "python3", "/root/DiffRhythm/infer/infer.py",
                 "--lrc-path", str(lyrics_file),
                 "--audio-length", str(duration),
                 "--repo-id", "ASLP-lab/DiffRhythm-base",
@@ -135,11 +133,13 @@ class DiffRhythmGenerator:
                 cmd,
                 capture_output=True,
                 text=True,
-                cwd="/root/DiffRhythm"
+                cwd="/root/DiffRhythm",
+                env={**os.environ, "PYTHONPATH": "/root/DiffRhythm"}
             )
             
             if result.returncode != 0:
-                print(f"❌ Error: {result.stderr}")
+                print(f"❌ STDOUT: {result.stdout}")
+                print(f"❌ STDERR: {result.stderr}")
                 raise RuntimeError(f"DiffRhythm failed: {result.stderr}")
             
             print(result.stdout)
@@ -147,9 +147,12 @@ class DiffRhythmGenerator:
             # Find generated file
             generated_files = list(tmpdir.glob("*.wav"))
             if not generated_files:
+                print(f"❌ No WAV files found in {tmpdir}")
+                print(f"Directory contents: {list(tmpdir.iterdir())}")
                 raise RuntimeError("No output file generated")
             
             output_file = generated_files[0]
+            print(f"📁 Found output: {output_file}")
             
             # Read audio bytes
             with open(output_file, "rb") as f:
@@ -209,6 +212,8 @@ def process_request(request_data: dict) -> bytes:
         
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
         raise
 
 
