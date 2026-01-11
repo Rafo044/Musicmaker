@@ -84,50 +84,48 @@ class DiffRhythmGenerator:
         lyrics: str,
         genre: str = "rock",
         duration: int = 95,
+        ref_audio_urls: list = None,
     ) -> bytes:
         """
-        Generate full song from lyrics.
-        
-        Args:
-            lyrics: Song lyrics with timestamps (LRC format)
-            genre: Music genre/style
-            duration: Song duration (95 or 285 seconds)
-            
-        Returns:
-            Audio bytes (WAV format)
+        Generate full song from lyrics with optional reference audios.
         """
         import subprocess
         import tempfile
+        import requests
         from pathlib import Path
         
         start_time = time.time()
+        ref_audio_urls = ref_audio_urls or []
         
-        print(f"🎤 Generating {genre} song ({duration}s)")
+        print(f"🎤 Generating {genre} song ({duration}s) with {len(ref_audio_urls)} references")
         
-        # Create temp files
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
             lyrics_file = tmpdir / "lyrics.lrc"
             
-            # Clean lyrics for DiffRhythm (No Verse/Chorus text, No Empty lines)
+            # Download reference audios
+            local_ref_paths = []
+            for i, url in enumerate(ref_audio_urls):
+                try:
+                    ref_path = tmpdir / f"ref_{i}.wav"
+                    print(f"Downloading reference style: {url}")
+                    resp = requests.get(url, timeout=10)
+                    if resp.status_code == 200:
+                        ref_path.write_bytes(resp.content)
+                        local_ref_paths.append(ref_path)
+                except Exception as e:
+                    print(f"Warning: Failed to download style ref {url}: {e}")
+
+            # Clean lyrics logic
             clean_lyrics = []
             for line in lyrics.split('\n'):
-                # 1. Strip structural labels: '[00:10.00] Verse 1' -> '[00:10.00]'
                 line = re.sub(r'(\[\d{2}:\d{2}\.\d{2}\])\s*(Verse|Chorus|Intro|Outro|Bridge|Solo|Hook|Header).*', r'\1', line, flags=re.IGNORECASE)
-                
-                # 2. Only keep lines with actual text to prevent 'Unknown Language' error
-                # Forced space after ] is critical for DiffRhythm's tokenizer
                 if re.search(r'\]\s*\S+', line):
-                    # Ensure single space after bracket ]
                     line = re.sub(r'\]\s*', r'] ', line)
                     clean_lyrics.append(line.strip())
             
-            final_lrc = '\n'.join(clean_lyrics)
-            lyrics_file.write_text(final_lrc)
+            lyrics_file.write_text('\n'.join(clean_lyrics))
             
-            print(f"📝 Processed LRC ({len(clean_lyrics)} lines)")
-            
-            # Stable High-Quality Settings
             enhanced_genre = f"{genre}, studio recording, clear dry vocals, steady rhythm, high fidelity"
             cmd = [
                 "python3", "/root/DiffRhythm/infer/infer.py",
@@ -138,8 +136,12 @@ class DiffRhythmGenerator:
                 "--chunked"
             ]
             
-            print(f"Executing DiffRhythm production...")
+            # If we have a reference audio, use the first one (or blend if supported)
+            # Currently standard DiffRhythm takes one --ref-audio-path
+            if local_ref_paths:
+                cmd.extend(["--ref-audio-path", str(local_ref_paths[0])])
             
+            print(f"Executing DiffRhythm production blend...")
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -149,22 +151,27 @@ class DiffRhythmGenerator:
             )
             
             if result.returncode != 0:
-                print(f"STDOUT: {result.stdout}")
                 print(f"STDERR: {result.stderr}")
                 raise RuntimeError(f"DiffRhythm failed: {result.stderr}")
             
-            # Find generated file
             generated_files = list(tmpdir.glob("*.wav"))
             if not generated_files:
                 raise RuntimeError("No output file generated")
             
-            output_file = generated_files[0]
-            with open(output_file, "rb") as f:
+            with open(generated_files[0], "rb") as f:
                 audio_bytes = f.read()
         
-        generation_time = time.time() - start_time
-        print(f"✅ Generated in {generation_time:.1f}s (Size: {len(audio_bytes)/1024/1024:.2f} MB)")
         return audio_bytes
+
+
+def check_url(url: str) -> bool:
+    """Shield: Verify if the URL is accessible before starting GPU generation."""
+    import requests
+    try:
+        response = requests.head(url, timeout=5)
+        return response.status_code == 200
+    except Exception:
+        return False
 
 
 def get_lyrics_from_data(data: dict) -> str:
@@ -197,12 +204,19 @@ def get_lyrics_from_data(data: dict) -> str:
 
 @app.function(image=image, timeout=600)
 def process_request(request_data: dict) -> bytes:
-    """Process lyrics-to-song request."""
+    """Process lyrics-to-song request with URL Shield."""
     try:
-        # Extract and convert lyrics
+        # Extract parameters
         lyrics = get_lyrics_from_data(request_data)
         genre = request_data.get("genre", "rock")
         duration = request_data.get("duration", 95)
+        ref_urls = request_data.get("ref_audio_urls", [])
+        
+        # URL Shield: Prevent execution if any reference URL is broken
+        for url in ref_urls:
+            print(f"Checking URL Shield: {url}")
+            if not check_url(url):
+                raise ValueError(f"CRITICAL: Reference URL is broken or inaccessible: {url}. Generation aborted.")
         
         if not lyrics:
             raise ValueError("No lyrics or structure provided")
@@ -216,6 +230,7 @@ def process_request(request_data: dict) -> bytes:
             lyrics=lyrics,
             genre=genre,
             duration=duration,
+            ref_audio_urls=ref_urls,
         )
     except Exception as e:
         print(f"❌ Error: {e}")

@@ -1,7 +1,12 @@
 {
-    "request_id": "req_indie_arctic_019",
-    "genre": "indie rock, professional studio recording, melodic, arctic monkeys style",
+    "request_id": "req_indie_arctic_020",
+    "genre": "indie rock, professional studio recording, melodic, arctic monkeys style, high fidelity, polished production",
     "duration": 220,
+    "ref_audio_urls": [
+        "https://aslp-lab.github.io/DiffRhythm.github.io/raw/samples/prompt/rock_en.wav",
+        "https://aslp-lab.github.io/DiffRhythm.github.io/raw/samples/prompt/classic_en.wav",
+        "https://aslp-lab.github.io/DiffRhythm.github.io/raw/samples/prompt/country_en.wav"
+    ],
     "structure": [
         {
             "type": "verse",
