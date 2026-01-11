@@ -1,0 +1,3 @@
+- Heç vaxt heç bir emoji, ikon və ya vizual simvol istifadə etmə.
+- Bu qayda həm ünsiyyətə, həm kod şərhlərinə (comments), həm commit mesajlarına, həm də yaradılan fayllara şamil edilir.
+- Cavabların və yazıların yalnız mətn formatında olmalıdır.

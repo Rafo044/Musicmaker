@@ -122,11 +122,11 @@ class DiffRhythmGenerator:
                 "--chunked",  # Enable chunked decoding for VRAM efficiency
             ]
             
-            # Add genre as ref-prompt if provided
-            if genre:
-                cmd.extend(["--ref-prompt", f"{genre} music"])
+            # Add quality tags to reference prompt
+            enhanced_genre = f"{genre} music, studio recording, high fidelity, clear dry vocals, close microphone, professional mastering, no reverb"
+            cmd.extend(["--ref-prompt", enhanced_genre])
             
-            print(f"🔧 Running: {' '.join(cmd)}")
+            print(f"Running command: {' '.join(cmd)}")
             
             result = subprocess.run(
                 cmd,
@@ -137,8 +137,8 @@ class DiffRhythmGenerator:
             )
             
             if result.returncode != 0:
-                print(f"❌ STDOUT: {result.stdout}")
-                print(f"❌ STDERR: {result.stderr}")
+                print(f"STDOUT: {result.stdout}")
+                print(f"STDERR: {result.stderr}")
                 raise RuntimeError(f"DiffRhythm failed: {result.stderr}")
             
             print(result.stdout)
@@ -146,7 +146,7 @@ class DiffRhythmGenerator:
             # Find generated file
             generated_files = list(tmpdir.glob("*.wav"))
             if not generated_files:
-                print(f"❌ No WAV files found in {tmpdir}")
+                print(f"No WAV files found in {tmpdir}")
                 print(f"Directory contents: {list(tmpdir.iterdir())}")
                 raise RuntimeError("No output file generated")
             

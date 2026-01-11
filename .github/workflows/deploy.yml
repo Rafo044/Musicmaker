@@ -101,44 +101,37 @@ jobs:
             fi
           done
       
-      - name: Install Google Drive dependencies
-        if: steps.check-files.outputs.has_files == 'true'
-        run: |
-          pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
-      
-      - name: Upload to Google Drive
+      - name: Send to Telegram
         if: steps.check-files.outputs.has_files == 'true'
         continue-on-error: true
         env:
-          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
-          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
-          GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
-          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          for file in output/*.wav output/*.mp4; do
-            if [ -f "$file" ]; then
-              echo "Uploading $file to Google Drive..."
-              python3 scripts/upload_to_drive.py "$file" || echo "⚠️  Upload failed, continuing..."
-            fi
-          done
-      
-      - name: Upload generated music (Backup)
-        if: steps.check-files.outputs.has_files == 'true'
+          pip install requests
+          FILES=$(ls output/*.wav output/*.mp4 2>/dev/null || true)
+          if [ ! -z "$FILES" ]; then
+            echo "Fayllar Telegram-a gonderilir..."
+            python3 scripts/send_to_telegram.py "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" $FILES
+          else
+            echo "Gonderilecek fayl tapilmadi."
+          fi
+
+      - name: Upload generated files (Artifacts)
+        if: always() && steps.check-files.outputs.has_files == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: music-${{ github.run_id }}
-          path: |
-            output/*.wav
-            output/*.mp4
+          name: output-${{ github.run_id }}
+          path: output/
+          if-no-files-found: error
           retention-days: 90
       
       - name: Output results
         if: always()
         run: |
           if [ "${{ steps.check-files.outputs.has_files }}" == "true" ]; then
-            echo "✅ Workflow completed"
-            echo "📦 Music files uploaded as artifacts"
-            echo "Download: Actions → This workflow → Artifacts"
+            echo "Is akisi tamamlandi."
+            echo "Fayllar Artifacts bolmesine yuklendi."
           else
             echo "ℹ️  No JSON files changed - skipped generation"
           fi

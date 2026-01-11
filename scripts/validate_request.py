@@ -32,7 +32,7 @@ def validate_request(json_file: str) -> bool:
         print(f"✅ Valid: {json_file}")
         return True
     except ValidationError as e:
-        print(f"❌ Invalid: {json_file}")
+        print(f"Invalid: {json_file}")
         print(f"Error: {e.message}")
         raise
 

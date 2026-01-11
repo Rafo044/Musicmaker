@@ -54,19 +54,19 @@ def test_lrc_file(json_file: str):
     lyrics = data.get('lyrics', '')
     request_id = data.get('request_id', 'unknown')
     
-    print(f"🔍 Testing: {request_id}")
-    print(f"📝 Lyrics length: {len(lyrics)} characters")
-    print(f"📊 Lines: {len(lyrics.split(chr(10)))}")
+    print(f"Testing: {request_id}")
+    print(f"Lyrics length: {len(lyrics)} characters")
+    print(f"Lines: {len(lyrics.split(chr(10)))}")
     
     # Validate
     is_valid, errors = validate_lrc_format(lyrics)
     
     if is_valid:
-        print(f"\n✅ LRC format is VALID!")
-        print(f"✅ Ready for DiffRhythm")
+        print(f"\nLRC format is VALID!")
+        print(f"Ready for DiffRhythm")
         return True
     else:
-        print(f"\n❌ LRC format has ERRORS:")
+        print(f"\nLRC format has ERRORS:")
         for error in errors[:10]:  # Show first 10 errors
             print(f"  - {error}")
         if len(errors) > 10:
@@ -82,14 +82,14 @@ if __name__ == "__main__":
     json_file = sys.argv[1]
     
     if not Path(json_file).exists():
-        print(f"❌ File not found: {json_file}")
+        print(f"File not found: {json_file}")
         sys.exit(1)
     
     try:
         is_valid = test_lrc_file(json_file)
         sys.exit(0 if is_valid else 1)
     except Exception as e:
-        print(f"❌ Test failed: {e}")
+        print(f"Test failed: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

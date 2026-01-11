@@ -143,7 +143,7 @@ if __name__ == "__main__":
     # Default background image
     image_path = Path("images/background.jpg")
     if not image_path.exists():
-        print(f"⚠️  Background image not found: {image_path}")
+        print(f"Background image not found: {image_path}")
         print("Creating default black background...")
         # Create black image with FFmpeg
         subprocess.run([
@@ -158,12 +158,12 @@ if __name__ == "__main__":
         # Create video
         create_video(str(audio_file), str(image_path), str(srt_path), str(video_path))
         
-        print(f"\n🎉 Video generation complete!")
-        print(f"📁 Video: {video_path}")
-        print(f"📊 Size: {video_path.stat().st_size / 1024 / 1024:.2f} MB")
+        print(f"\nVideo generation complete!")
+        print(f"Video: {video_path}")
+        print(f"Size: {video_path.stat().st_size / 1024 / 1024:.2f} MB")
         
     except Exception as e:
-        print(f"❌ Video creation failed: {e}")
+        print(f"Video creation failed: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

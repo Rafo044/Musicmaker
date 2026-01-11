@@ -12,7 +12,7 @@ def dry_run_test(json_file: str):
     
     This simulates the GitHub Actions workflow locally.
     """
-    print("🧪 DRY RUN TEST - No GPU Usage")
+    print("DRY RUN TEST - No GPU Usage")
     print("=" * 50)
     print()
     
@@ -20,9 +20,9 @@ def dry_run_test(json_file: str):
     try:
         with open(json_file) as f:
             data = json.load(f)
-        print("✅ Step 1: JSON file loaded")
+        print("Step 1: JSON file loaded")
     except Exception as e:
-        print(f"❌ Step 1 FAILED: {e}")
+        print(f"Step 1 FAILED: {e}")
         return False
     
     # Validate schema
@@ -32,9 +32,9 @@ def dry_run_test(json_file: str):
         with open(schema_path) as f:
             schema = json.load(f)
         validate(instance=data, schema=schema)
-        print("✅ Step 2: JSON schema valid")
+        print("Step 2: JSON schema valid")
     except Exception as e:
-        print(f"❌ Step 2 FAILED: {e}")
+        print(f"Step 2 FAILED: {e}")
         return False
     
     # Validate LRC
@@ -52,14 +52,14 @@ def dry_run_test(json_file: str):
                 errors.append(f"Line {i}: No timestamp")
         
         if errors:
-            print(f"❌ Step 3 FAILED: LRC errors:")
+            print(f"Step 3 FAILED: LRC errors:")
             for err in errors[:5]:
                 print(f"   - {err}")
             return False
         
-        print("✅ Step 3: LRC format valid")
+        print("Step 3: LRC format valid")
     except Exception as e:
-        print(f"❌ Step 3 FAILED: {e}")
+        print(f"Step 3 FAILED: {e}")
         return False
     
     # Check required fields
@@ -76,35 +76,35 @@ def dry_run_test(json_file: str):
         if duration not in [95, 285]:
             raise ValueError(f"Invalid duration: {duration} (must be 95 or 285)")
         
-        print("✅ Step 4: Required fields present")
+        print("Step 4: Required fields present")
         print(f"   - Request ID: {request_id}")
         print(f"   - Genre: {genre}")
         print(f"   - Duration: {duration}s")
         print(f"   - Lyrics length: {len(lyrics)} chars")
     except Exception as e:
-        print(f"❌ Step 4 FAILED: {e}")
+        print(f"Step 4 FAILED: {e}")
         return False
     
     # Simulate Modal deployment (without actually deploying)
-    print("✅ Step 5: Modal deployment (simulated)")
+    print("Step 5: Modal deployment (simulated)")
     print("   - Would deploy to: musicmaker-diffrhythm")
     print("   - GPU: A10G (24GB)")
     print("   - Estimated time: 2-3 minutes")
     print("   - Estimated cost: ~$0.03")
     
     # Simulate video creation
-    print("✅ Step 6: Video creation (simulated)")
+    print("Step 6: Video creation (simulated)")
     print("   - FFmpeg would create MP4")
     print("   - Karaoke subtitles from LRC")
     
     # Simulate uploads
-    print("✅ Step 7: Uploads (simulated)")
-    print("   - Google Drive: Would upload WAV + MP4")
+    print("Step 7: Uploads (simulated)")
+    print("   - Webhook: Would send WAV + MP4")
     print("   - GitHub Artifacts: Would upload as backup")
     
     print()
     print("=" * 50)
-    print("✅ DRY RUN PASSED - Ready for deployment!")
+    print("DRY RUN PASSED - Ready for deployment!")
     print("=" * 50)
     print()
     print("💡 To deploy for real:")
