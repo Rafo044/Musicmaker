@@ -9,12 +9,13 @@ from google.auth.transport.requests import Request
 
 def get_gdrive_service():
     """Build and return a Google Drive service object."""
-    client_id = os.environ.get("GDRIVE_CLIENT_ID")
-    client_secret = os.environ.get("GDRIVE_CLIENT_SECRET")
-    refresh_token = os.environ.get("GDRIVE_REFRESH_TOKEN")
+    # Use .strip() to prevent 'invalid_client' errors due to hidden spaces in secrets
+    client_id = os.environ.get("GDRIVE_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("GDRIVE_CLIENT_SECRET", "").strip()
+    refresh_token = os.environ.get("GDRIVE_REFRESH_TOKEN", "").strip()
 
     if not all([client_id, client_secret, refresh_token]):
-        print("Error: Missing Google Drive credentials (ClientID, Secret, or RefreshToken)")
+        print("Error: Missing Google Drive credentials (GDRIVE_CLIENT_ID, SECRET, or REFRESH_TOKEN)")
         return None
 
     creds = Credentials(
@@ -26,14 +27,18 @@ def get_gdrive_service():
     )
 
     if not creds.valid:
-        creds.refresh(Request())
+        try:
+            creds.refresh(Request())
+        except Exception as e:
+            print(f"Error: Refreshing token failed. This is often due to invalid Client ID/Secret or Expired Refresh Token.")
+            print(f"Technical Error: {e}")
+            raise
 
     return build("drive", "v3", credentials=creds)
 
 def check_file_exists(service, name, folder_id):
     """Check if a file with the same name exists in the target folder."""
-    query = f"nameSelection = '{name}' and '{folder_id}' in parents and trashed = false"
-    # Note: Using simple name check. In Drive v3, the field is 'name'.
+    # Search for the exact name in the specific parent folder
     query = f"name = '{name}' and '{folder_id}' in parents and trashed = false"
     response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
     return response.get('files', [])
