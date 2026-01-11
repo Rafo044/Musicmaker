@@ -50,6 +50,14 @@ jobs:
             python3 scripts/validate_request.py "$file"
           done
       
+      - name: Validate LRC format
+        if: steps.check-files.outputs.has_files == 'true'
+        run: |
+          for file in ${{ steps.changed-files.outputs.files }}; do
+            echo "Testing LRC format: $file"
+            python3 scripts/test_lrc.py "$file"
+          done
+      
       - name: Deploy to Modal
         if: steps.check-files.outputs.has_files == 'true'
         env:
