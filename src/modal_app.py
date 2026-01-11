@@ -131,30 +131,31 @@ class DiffRhythmGenerator:
                     clean_lyrics.append(line.strip())
             
             lyrics_file.write_text('\n'.join(clean_lyrics))
+
+            # PATCH: infer.py has hardcoded steps/cfg. We update them via sed for Ultra-Quality.
+            print("Applying Ultra-Quality patch to DiffRhythm engine...")
+            subprocess.run(["sed", "-i", "s/steps=32/steps=60/g", "/root/DiffRhythm/infer/infer.py"], check=True)
+            subprocess.run(["sed", "-i", "s/cfg_strength=4.0/cfg_strength=9.5/g", "/root/DiffRhythm/infer/infer.py"], check=True)
             
-            # Prepare DiffRhythm Command with High-Quality Settings
+            # Prepare DiffRhythm Command (Removing invalid CLI args, using our patched fallbacks)
             cmd = [
                 "python3", "/root/DiffRhythm/infer/infer.py",
                 "--lrc-path", str(lyrics_file),
                 "--audio-length", str(duration),
                 "--output-dir", str(output_dir),
-                "--steps", "60",        # Boost steps for higher quality
-                "--cfg-scale", "9.5",    # Stricter adherence to style/vocal
                 "--chunked"
             ]
 
             # Logic: Use a SINGLE, target reference for maximum "Original" vocal purity
             if local_ref_paths:
-                # We use only the first (prime) reference to avoid blending artifacts (mushy vocals)
                 target_ref = local_ref_paths[0]
                 print(f"Using PRIMARY reference for original vocal timbre: {ref_audio_urls[0]}")
                 cmd.extend(["--ref-audio-path", str(target_ref)])
             else:
-                # Use text prompt ONLY if no audio reference is provided
                 enhanced_genre = f"{genre}, studio recording, clear dry vocals, steady rhythm, high fidelity"
                 cmd.extend(["--ref-prompt", enhanced_genre])
             
-            print(f"Executing Ultra-Quality DiffRhythm Production...")
+            print(f"Executing Ultra-Quality patched production...")
             result = subprocess.run(
                 cmd,
                 capture_output=True,
