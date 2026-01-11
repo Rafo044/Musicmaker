@@ -70,13 +70,28 @@ jobs:
             python3 scripts/process_request.py "$file"
           done
       
+      - name: Create videos with FFmpeg
+        if: success() && steps.check-files.outputs.has_files == 'true'
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          for file in ${{ steps.changed-files.outputs.files }}; do
+            if [ -f "$file" ]; then
+              request_id=$(basename "$file" .json)
+              audio_file="output/${request_id}"*.wav
+              if [ -f $audio_file ]; then
+                echo "Creating video for $request_id..."
+                python3 scripts/create_video.py "$file" $audio_file
+              fi
+            fi
+          done
+      
       - name: Upload to Google Drive
         if: success() && steps.check-files.outputs.has_files == 'true'
         env:
           GOOGLE_DRIVE_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_API }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         run: |
-          for file in output/*.wav; do
+          for file in output/*.wav output/*.mp4; do
             if [ -f "$file" ]; then
               echo "Uploading $file to Google Drive..."
               python3 scripts/upload_to_drive.py "$file"
@@ -88,7 +103,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: music-${{ github.run_id }}
-          path: output/*.wav
+          path: |
+            output/*.wav
+            output/*.mp4
           retention-days: 90
       
       - name: Output results
