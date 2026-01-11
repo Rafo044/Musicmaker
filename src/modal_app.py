@@ -132,40 +132,29 @@ class DiffRhythmGenerator:
             
             lyrics_file.write_text('\n'.join(clean_lyrics))
             
-            # Prepare DiffRhythm Command
+            # Prepare DiffRhythm Command with High-Quality Settings
             cmd = [
                 "python3", "/root/DiffRhythm/infer/infer.py",
                 "--lrc-path", str(lyrics_file),
                 "--audio-length", str(duration),
                 "--output-dir", str(output_dir),
+                "--steps", "60",        # Boost steps for higher quality
+                "--cfg-scale", "9.5",    # Stricter adherence to style/vocal
                 "--chunked"
             ]
 
-            # Logic: If Audio Reference exists, WE MUST NOT use --ref-prompt
+            # Logic: Use a SINGLE, target reference for maximum "Original" vocal purity
             if local_ref_paths:
-                print(f"Blending {len(local_ref_paths)} reference styles into one...")
-                blended_ref = refs_dir / "blended_style.wav"
-                
-                if len(local_ref_paths) > 1:
-                    inputs = []
-                    for p in local_ref_paths:
-                        inputs.extend(["-i", str(p)])
-                    
-                    filter_str = "".join([f"[{i}:a]" for i in range(len(local_ref_paths))])
-                    filter_str += f"concat=n={len(local_ref_paths)}:v=0:a=1[aout]"
-                    
-                    ffmpeg_cmd = ["ffmpeg"] + inputs + ["-filter_complex", filter_str, "-map", "[aout]", str(blended_ref)]
-                    subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
-                else:
-                    import shutil
-                    shutil.copy(local_ref_paths[0], blended_ref)
-                
-                cmd.extend(["--ref-audio-path", str(blended_ref)])
+                # We use only the first (prime) reference to avoid blending artifacts (mushy vocals)
+                target_ref = local_ref_paths[0]
+                print(f"Using PRIMARY reference for original vocal timbre: {ref_audio_urls[0]}")
+                cmd.extend(["--ref-audio-path", str(target_ref)])
             else:
+                # Use text prompt ONLY if no audio reference is provided
                 enhanced_genre = f"{genre}, studio recording, clear dry vocals, steady rhythm, high fidelity"
                 cmd.extend(["--ref-prompt", enhanced_genre])
             
-            print(f"Executing DiffRhythm High-End Production...")
+            print(f"Executing Ultra-Quality DiffRhythm Production...")
             result = subprocess.run(
                 cmd,
                 capture_output=True,

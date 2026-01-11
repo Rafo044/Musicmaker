@@ -1,11 +1,9 @@
 {
-    "request_id": "req_indie_arctic_024",
-    "genre": "active indie rock, fast tempo, upbeat, professional studio recording, melodic, arctic monkeys style, high fidelity, polished production, driving beat",
+    "request_id": "req_indie_arctic_025",
+    "genre": "active indie rock, fast tempo, driving beat, professional studio recording, melodic, arctic monkeys style",
     "duration": 220,
     "ref_audio_urls": [
-        "https://aslp-lab.github.io/DiffRhythm.github.io/raw/samples/prompt/rock_en.wav",
-        "https://aslp-lab.github.io/DiffRhythm.github.io/raw/samples/prompt/Whataya_Want_from_Me.wav",
-        "https://aslp-lab.github.io/DiffRhythm.github.io/raw/samples/prompt/brightest_light_in_the_night_sky.wav"
+        "https://aslp-lab.github.io/DiffRhythm.github.io/raw/samples/prompt/rock_en.wav"
     ],
     "structure": [
         {
