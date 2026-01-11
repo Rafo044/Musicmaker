@@ -14,8 +14,10 @@ on:
 jobs:
   upload-to-drive:
     runs-on: ubuntu-latest
-    # Allow if triggered manually OR if the parent workflow succeeded
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # Secure logic for both manual and automatic triggers
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      (github.event.workflow_run && github.event.workflow_run.conclusion == 'success')
     
     steps:
       - name: Checkout code
