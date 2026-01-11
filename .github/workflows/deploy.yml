@@ -53,8 +53,8 @@ jobs:
       - name: Deploy to Modal
         if: steps.check-files.outputs.has_files == 'true'
         env:
-          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
-          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          MODAL_TOKEN_ID: ${{ secrets.TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.TOKEN_SECRET }}
         run: |
           modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET
           modal deploy src/modal_app.py
@@ -62,8 +62,8 @@ jobs:
       - name: Process requests
         if: steps.check-files.outputs.has_files == 'true'
         env:
-          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
-          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          MODAL_TOKEN_ID: ${{ secrets.TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.TOKEN_SECRET }}
         run: |
           for file in ${{ steps.changed-files.outputs.files }}; do
             echo "Processing $file"
