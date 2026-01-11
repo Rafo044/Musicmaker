@@ -24,21 +24,34 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install modal pydantic jsonschema
+          pip install modal pydantic jsonschema pyyaml
       
       - name: Get changed JSON files
         id: changed-files
         run: |
           echo "files=$(git diff --name-only HEAD~1 HEAD | grep 'requests/.*\.json$' | tr '\n' ' ')" >> $GITHUB_OUTPUT
       
+      - name: Check if files changed
+        id: check-files
+        run: |
+          if [ -z "${{ steps.changed-files.outputs.files }}" ]; then
+            echo "has_files=false" >> $GITHUB_OUTPUT
+            echo "⚠️  No JSON files changed"
+          else
+            echo "has_files=true" >> $GITHUB_OUTPUT
+            echo "✅ Found changed files: ${{ steps.changed-files.outputs.files }}"
+          fi
+      
       - name: Validate JSON schemas
+        if: steps.check-files.outputs.has_files == 'true'
         run: |
           for file in ${{ steps.changed-files.outputs.files }}; do
             echo "Validating $file"
-            python scripts/validate_request.py "$file"
+            python3 scripts/validate_request.py "$file"
           done
       
       - name: Deploy to Modal
+        if: steps.check-files.outputs.has_files == 'true'
         env:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
@@ -47,17 +60,18 @@ jobs:
           modal deploy src/modal_app.py
       
       - name: Process requests
+        if: steps.check-files.outputs.has_files == 'true'
         env:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
         run: |
           for file in ${{ steps.changed-files.outputs.files }}; do
             echo "Processing $file"
-            python scripts/process_request.py "$file"
+            python3 scripts/process_request.py "$file"
           done
       
       - name: Upload generated music
-        if: success()
+        if: success() && steps.check-files.outputs.has_files == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: music-${{ github.run_id }}
@@ -67,6 +81,10 @@ jobs:
       - name: Output results
         if: always()
         run: |
-          echo "✅ Workflow completed"
-          echo "📦 Music files uploaded as artifacts"
-          echo "Download: Actions → This workflow → Artifacts"
+          if [ "${{ steps.check-files.outputs.has_files }}" == "true" ]; then
+            echo "✅ Workflow completed"
+            echo "📦 Music files uploaded as artifacts"
+            echo "Download: Actions → This workflow → Artifacts"
+          else
+            echo "ℹ️  No JSON files changed - skipped generation"
+          fi
