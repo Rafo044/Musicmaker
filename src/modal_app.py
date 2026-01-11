@@ -126,22 +126,44 @@ class DiffRhythmGenerator:
             
             lyrics_file.write_text('\n'.join(clean_lyrics))
             
-            enhanced_genre = f"{genre}, studio recording, clear dry vocals, steady rhythm, high fidelity"
+            # Prepare DiffRhythm Command
             cmd = [
                 "python3", "/root/DiffRhythm/infer/infer.py",
                 "--lrc-path", str(lyrics_file),
                 "--audio-length", str(duration),
                 "--output-dir", str(tmpdir),
-                "--ref-prompt", enhanced_genre,
                 "--chunked"
             ]
-            
-            # If we have a reference audio, use the first one (or blend if supported)
-            # Currently standard DiffRhythm takes one --ref-audio-path
+
+            # Logic: If Audio Reference exists, WE MUST NOT use --ref-prompt (AssertionError Fix)
             if local_ref_paths:
-                cmd.extend(["--ref-audio-path", str(local_ref_paths[0])])
+                print(f"Blending {len(local_ref_paths)} reference styles into one...")
+                blended_ref = tmpdir / "blended_style.wav"
+                
+                if len(local_ref_paths) > 1:
+                    # Stitch audios together using FFmpeg
+                    # Each input -i file, then filter_complex to concat audio (v=0, a=1)
+                    inputs = []
+                    for p in local_ref_paths:
+                        inputs.extend(["-i", str(p)])
+                    
+                    filter_str = "".join([f"[{i}:a]" for i in range(len(local_ref_paths))])
+                    filter_str += f"concat=n={len(local_ref_paths)}:v=0:a=1[aout]"
+                    
+                    ffmpeg_cmd = ["ffmpeg"] + inputs + ["-filter_complex", filter_str, "-map", "[aout]", str(blended_ref)]
+                    subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
+                else:
+                    # Just one file, copy it
+                    import shutil
+                    shutil.copy(local_ref_paths[0], blended_ref)
+                
+                cmd.extend(["--ref-audio-path", str(blended_ref)])
+            else:
+                # Use text prompt ONLY if no audio reference is provided
+                enhanced_genre = f"{genre}, studio recording, clear dry vocals, steady rhythm, high fidelity"
+                cmd.extend(["--ref-prompt", enhanced_genre])
             
-            print(f"Executing DiffRhythm production blend...")
+            print(f"Executing DiffRhythm High-End Production...")
             result = subprocess.run(
                 cmd,
                 capture_output=True,
