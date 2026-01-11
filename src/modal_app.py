@@ -99,15 +99,20 @@ class DiffRhythmGenerator:
         
         print(f"🎤 Generating {genre} song ({duration}s) with {len(ref_audio_urls)} references")
         
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir = Path(tmpdir)
-            lyrics_file = tmpdir / "lyrics.lrc"
+        with tempfile.TemporaryDirectory() as tmp_root:
+            tmp_root = Path(tmp_root)
+            refs_dir = tmp_root / "refs"
+            output_dir = tmp_root / "output"
+            refs_dir.mkdir()
+            output_dir.mkdir()
             
-            # Download reference audios
+            lyrics_file = tmp_root / "lyrics.lrc"
+            
+            # Download reference audios to refs_dir
             local_ref_paths = []
             for i, url in enumerate(ref_audio_urls):
                 try:
-                    ref_path = tmpdir / f"ref_{i}.wav"
+                    ref_path = refs_dir / f"ref_{i}.wav"
                     print(f"Downloading reference style: {url}")
                     resp = requests.get(url, timeout=10)
                     if resp.status_code == 200:
@@ -121,6 +126,7 @@ class DiffRhythmGenerator:
             for line in lyrics.split('\n'):
                 line = re.sub(r'(\[\d{2}:\d{2}\.\d{2}\])\s*(Verse|Chorus|Intro|Outro|Bridge|Solo|Hook|Header).*', r'\1', line, flags=re.IGNORECASE)
                 if re.search(r'\]\s*\S+', line):
+                    # Ensure single space after bracket ]
                     line = re.sub(r'\]\s*', r'] ', line)
                     clean_lyrics.append(line.strip())
             
@@ -131,18 +137,16 @@ class DiffRhythmGenerator:
                 "python3", "/root/DiffRhythm/infer/infer.py",
                 "--lrc-path", str(lyrics_file),
                 "--audio-length", str(duration),
-                "--output-dir", str(tmpdir),
+                "--output-dir", str(output_dir),
                 "--chunked"
             ]
 
-            # Logic: If Audio Reference exists, WE MUST NOT use --ref-prompt (AssertionError Fix)
+            # Logic: If Audio Reference exists, WE MUST NOT use --ref-prompt
             if local_ref_paths:
                 print(f"Blending {len(local_ref_paths)} reference styles into one...")
-                blended_ref = tmpdir / "blended_style.wav"
+                blended_ref = refs_dir / "blended_style.wav"
                 
                 if len(local_ref_paths) > 1:
-                    # Stitch audios together using FFmpeg
-                    # Each input -i file, then filter_complex to concat audio (v=0, a=1)
                     inputs = []
                     for p in local_ref_paths:
                         inputs.extend(["-i", str(p)])
@@ -153,13 +157,11 @@ class DiffRhythmGenerator:
                     ffmpeg_cmd = ["ffmpeg"] + inputs + ["-filter_complex", filter_str, "-map", "[aout]", str(blended_ref)]
                     subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
                 else:
-                    # Just one file, copy it
                     import shutil
                     shutil.copy(local_ref_paths[0], blended_ref)
                 
                 cmd.extend(["--ref-audio-path", str(blended_ref)])
             else:
-                # Use text prompt ONLY if no audio reference is provided
                 enhanced_genre = f"{genre}, studio recording, clear dry vocals, steady rhythm, high fidelity"
                 cmd.extend(["--ref-prompt", enhanced_genre])
             
@@ -176,9 +178,10 @@ class DiffRhythmGenerator:
                 print(f"STDERR: {result.stderr}")
                 raise RuntimeError(f"DiffRhythm failed: {result.stderr}")
             
-            generated_files = list(tmpdir.glob("*.wav"))
+            # PICK ONLY FROM output_dir (Avoid picking references)
+            generated_files = list(output_dir.glob("*.wav"))
             if not generated_files:
-                raise RuntimeError("No output file generated")
+                raise RuntimeError("No output file generated in output directory")
             
             with open(generated_files[0], "rb") as f:
                 audio_bytes = f.read()
