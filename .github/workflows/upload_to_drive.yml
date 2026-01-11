@@ -23,6 +23,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Resolve Run ID
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID="${{ github.event.inputs.run_id }}"
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID="${{ github.event.workflow_run.id }}"
+          fi
+          
+          if [ -z "$RUN_ID" ]; then
+            echo "No Run ID provided. Finding latest successful 'Deploy Music Generation' run..."
+            RUN_ID=$(gh run list --workflow "Deploy Music Generation" --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          fi
+          
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
+            echo "Error: Could not find a valid Run ID to sync."
+            exit 1
+          fi
+          
+          echo "Using Run ID: $RUN_ID"
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -31,16 +54,12 @@ jobs:
       - name: Install dependencies
         run: |
           pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
-      
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          # Prefer manual input run_id, then triggering workflow_run ID
-          run-id: ${{ github.event.inputs.run_id || github.event.workflow_run.id }}
-          # The pattern used in deploy.yml is output-${run_id}. 
-          # If we don't know the exact name, we can try to find it or use a pattern.
-          # Here we assume the name matches the run_id used.
-          name: output-${{ github.event.inputs.run_id || github.event.workflow_run.id }}
+          run-id: ${{ steps.resolve.outputs.run_id }}
+          name: output-${{ steps.resolve.outputs.run_id }}
           path: output/
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
