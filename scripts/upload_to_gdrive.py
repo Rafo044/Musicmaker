@@ -8,14 +8,14 @@ from googleapiclient.http import MediaFileUpload
 from google.auth.transport.requests import Request
 
 def get_gdrive_service():
-    """Build and return a Google Drive service object."""
-    # Use .strip() to prevent 'invalid_client' errors due to hidden spaces in secrets
+    """Build and return a Google Drive service object with diagnostics."""
     client_id = os.environ.get("GDRIVE_CLIENT_ID", "").strip()
     client_secret = os.environ.get("GDRIVE_CLIENT_SECRET", "").strip()
     refresh_token = os.environ.get("GDRIVE_REFRESH_TOKEN", "").strip()
 
     if not all([client_id, client_secret, refresh_token]):
-        print("Error: Missing Google Drive credentials (GDRIVE_CLIENT_ID, SECRET, or REFRESH_TOKEN)")
+        print("Error: Missing core credentials!")
+        print(f"Checked: ID={'OK' if client_id else 'MISSING'}, Secret={'OK' if client_secret else 'MISSING'}, Token={'OK' if refresh_token else 'MISSING'}")
         return None
 
     creds = Credentials(
@@ -28,18 +28,28 @@ def get_gdrive_service():
 
     if not creds.valid:
         try:
+            print(f"Attempting to refresh access token for ClientID: {client_id[:10]}...")
             creds.refresh(Request())
         except Exception as e:
-            print(f"Error: Refreshing token failed. This is often due to invalid Client ID/Secret or Expired Refresh Token.")
-            print(f"Technical Error: {e}")
+            print("\n--- DIAGNOSIS: AUTHENTICATION FAILED ---")
+            print(f"Message: {e}")
+            if "invalid_client" in str(e).lower():
+                print("Advice: Your GDRIVE_CLIENT_ID or CLIENT_SECRET is likely WRONG or belongs to a different project.")
+            elif "invalid_grant" in str(e).lower():
+                print("Advice: Your REFRESH_TOKEN is invalid or has been revoked.")
+            print("------------------------------------------\n")
             raise
 
     return build("drive", "v3", credentials=creds)
 
 def check_file_exists(service, name, folder_id):
     """Check if a file with the same name exists in the target folder."""
-    # Search for the exact name in the specific parent folder
-    query = f"name = '{name}' and '{folder_id}' in parents and trashed = false"
+    if not folder_id:
+        # If no folder_id, search in overall drive (less safe but works as fallback)
+        query = f"name = '{name}' and trashed = false"
+    else:
+        query = f"name = '{name}' and '{folder_id}' in parents and trashed = false"
+    
     response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
     return response.get('files', [])
 
