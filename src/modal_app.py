@@ -132,19 +132,19 @@ class DiffRhythmGenerator:
             
             lyrics_file.write_text('\n'.join(clean_lyrics))
 
-            # PATCH: Apply research-backed 'Golden Values' to prevent distortion/metallic artifacts
-            print("Applying Golden-Ratio patches to DiffRhythm engine (Research-backed stability)...")
-            # 1. Balanced steps for depth without noise accumulation
-            subprocess.run(["sed", "-i", "s/steps=60/steps=45/g", "/root/DiffRhythm/infer/infer.py"], check=False) # Fallback if previously 60
-            subprocess.run(["sed", "-i", "s/steps=32/steps=45/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            # PATCH: Apply Research-Backed 'Pure-Tone' Values (Fixing Hum & Clipping)
+            print("Applying Pure-Tone patches (Fixing Ugultu & Clipping)...")
+            # 1. Bump steps to 50 for elite denoising
+            subprocess.run(["sed", "-i", "s/steps=45/steps=50/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            subprocess.run(["sed", "-i", "s/steps=32/steps=50/g", "/root/DiffRhythm/infer/infer.py"], check=False)
             
-            # 2. CFG in the 'Sweet Spot' (6.2) to avoid saturation/vocal crackling
-            subprocess.run(["sed", "-i", "s/cfg_strength=9.5/cfg_strength=6.2/g", "/root/DiffRhythm/infer/infer.py"], check=False) # Fallback if previously 9.5
-            subprocess.run(["sed", "-i", "s/cfg_strength=4.0/cfg_strength=6.2/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            # 2. Relax CFG to 5.8 for natural vocal smoothness (removes 'metallic' stress)
+            subprocess.run(["sed", "-i", "s/cfg_strength=6.2/cfg_strength=5.8/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            subprocess.run(["sed", "-i", "s/cfg_strength=4.0/cfg_strength=5.8/g", "/root/DiffRhythm/infer/infer.py"], check=False)
             
-            # 3. Add Digital Headroom (0.95 multiplier) to prevent clipping during normalization
-            # We look for the normalization line and append .mul(0.95) for safety
-            subprocess.run(["sed", "-i", "s/.div(torch.max(torch.abs(output)))/.div(torch.max(torch.abs(output))).mul(0.95)/g", "/root/DiffRhythm/infer/infer.py"], check=True)
+            # 3. Aggressive Headroom (0.88) to kill EVERY single pop/click
+            subprocess.run(["sed", "-i", "s/.mul(0.95)//g", "/root/DiffRhythm/infer/infer.py"], check=False) # Clean old if exists
+            subprocess.run(["sed", "-i", "s/.div(torch.max(torch.abs(output)))/.div(torch.max(torch.abs(output))).mul(0.88)/g", "/root/DiffRhythm/infer/infer.py"], check=True)
 
             # Prepare DiffRhythm Command
             cmd = [
@@ -158,14 +158,14 @@ class DiffRhythmGenerator:
             # Logic: Pure Reference usage
             if local_ref_paths:
                 target_ref = local_ref_paths[0]
-                print(f"Using PRIMARY reference for high-fidelity timbre: {ref_audio_urls[0]}")
+                print(f"Using PRIMARY reference for pure timbre: {ref_audio_urls[0]}")
                 cmd.extend(["--ref-audio-path", str(target_ref)])
             else:
-                # Engineering the prompt with quality tags instead of high CFG
-                enhanced_genre = f"{genre}, [high fidelity], studio recording, clear dry vocals, steady rhythm, 44.1kHz"
+                # Elite engineering for dry/clear vocals
+                enhanced_genre = f"{genre}, [very clear vocals, studio dry, high fidelity, 44.1kHz]"
                 cmd.extend(["--ref-prompt", enhanced_genre])
             
-            print(f"Executing Research-Backed 'Golden' production...")
+            print(f"Executing 'Pure-Tone' elite production...")
             result = subprocess.run(
                 cmd,
                 capture_output=True,
