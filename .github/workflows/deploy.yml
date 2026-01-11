@@ -25,6 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install modal pydantic jsonschema pyyaml
+          pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
       
       - name: Get changed JSON files
         id: changed-files
@@ -94,7 +95,8 @@ jobs:
           done
       
       - name: Upload to Google Drive
-        if: success() && steps.check-files.outputs.has_files == 'true'
+        if: steps.check-files.outputs.has_files == 'true'
+        continue-on-error: true
         env:
           GOOGLE_DRIVE_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_API }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
@@ -102,12 +104,12 @@ jobs:
           for file in output/*.wav output/*.mp4; do
             if [ -f "$file" ]; then
               echo "Uploading $file to Google Drive..."
-              python3 scripts/upload_to_drive.py "$file"
+              python3 scripts/upload_to_drive.py "$file" || echo "⚠️  Upload failed, continuing..."
             fi
           done
       
       - name: Upload generated music (Backup)
-        if: success() && steps.check-files.outputs.has_files == 'true'
+        if: steps.check-files.outputs.has_files == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: music-${{ github.run_id }}
