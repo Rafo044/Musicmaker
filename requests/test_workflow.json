@@ -1,6 +1,6 @@
 {
-    "request_id": "req_test_workflow_v2",
-    "lyrics": "[00:00.00] Test\n[00:05.00] This is a test song\n[00:10.00] To trigger the workflow\n\n[00:15.00] Chorus\n[00:16.00] GitHub Actions test v2",
+    "request_id": "req_test_v3",
+    "lyrics": "[00:00.00] Test v3\n[00:05.00] Fixed repo-id issue\n[00:10.00] Should work now\n\n[00:15.00] Chorus\n[00:16.00] GitHub Actions working",
     "genre": "rock",
     "duration": 95
 }
