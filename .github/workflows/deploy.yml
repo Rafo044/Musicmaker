@@ -94,6 +94,11 @@ jobs:
             fi
           done
       
+      - name: Install Google Drive dependencies
+        if: steps.check-files.outputs.has_files == 'true'
+        run: |
+          pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+      
       - name: Upload to Google Drive
         if: steps.check-files.outputs.has_files == 'true'
         continue-on-error: true
