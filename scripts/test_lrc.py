@@ -40,6 +40,31 @@ def validate_lrc_format(lyrics: str) -> tuple[bool, list[str]]:
     return len(errors) == 0, errors
 
 
+def get_lyrics_from_data(data: dict) -> str:
+    """Extract or generate LRC lyrics from request data."""
+    lyrics_text = data.get('lyrics', '')
+    structure = data.get('structure', [])
+    
+    if structure:
+        import re
+        lrc_lines = []
+        for section in structure:
+            start_str = section.get("start", "00:00.00")
+            time_match = re.search(r'(\d{2}):(\d{2}\.\d{2})', start_str)
+            if time_match:
+                base_min = int(time_match.group(1))
+                base_sec = float(time_match.group(2))
+                base_total = base_min * 60 + base_sec
+                lines = section.get("lines", [])
+                for i, line in enumerate(lines):
+                    line_total = base_total + (i * 4.0)
+                    m = int(line_total // 60)
+                    s = line_total % 60
+                    lrc_lines.append(f"[{m:02d}:{s:05.2f}] {line}")
+        return "\n".join(lrc_lines)
+    return lyrics_text
+
+
 def test_lrc_file(json_file: str):
     """Test LRC format in JSON request."""
     
@@ -47,10 +72,14 @@ def test_lrc_file(json_file: str):
     with open(json_file) as f:
         data = json.load(f)
     
-    lyrics = data.get('lyrics', '')
+    lyrics = get_lyrics_from_data(data)
     request_id = data.get('request_id', 'unknown')
     
     print(f"Testing: {request_id}")
+    if not lyrics:
+        print("Error: No lyrics or structure found")
+        return False
+        
     print(f"Lyrics length: {len(lyrics)} characters")
     print(f"Lines: {len(lyrics.split(chr(10)))}")
     

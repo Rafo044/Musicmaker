@@ -3,6 +3,7 @@
 import modal
 import os
 import time
+import re
 
 # Create Modal app
 app = modal.App("musicmaker-diffrhythm")
@@ -102,41 +103,34 @@ class DiffRhythmGenerator:
         start_time = time.time()
         
         print(f"🎤 Generating {genre} song ({duration}s)")
-        print(f"📝 Lyrics: {lyrics[:100]}...")
         
         # Create temp files
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
-            
-            # Write lyrics to file
             lyrics_file = tmpdir / "lyrics.lrc"
-            with open(lyrics_file, "w", encoding="utf-8") as f:
-                f.write(lyrics)
             
-            # Research-based Lyrics Cleanup: Remove Verse/Chorus/Intro labels entirely
-            import re
+            # Clean lyrics for DiffRhythm (No Verse/Chorus text, No Empty lines)
             clean_lyrics = []
             for line in lyrics.split('\n'):
-                # Strip labels after timestamp: '[00:10.00] Verse 1' -> '[00:10.00]'
-                # DiffRhythm sings whatever is after the bracket.
-                cleaned = re.sub(r'(\[\d{2}:\d{2}\.\d{2}\])\s*(Verse|Chorus|Intro|Outro|Bridge|Solo|Hook|Header).*', r'\1', line, flags=re.IGNORECASE)
-                # Keep lines that have actual lyrics, but strip standalone headers
-                if cleaned.strip() and not re.search(r'\]\s*$', cleaned):
-                    clean_lyrics.append(cleaned)
-                elif re.search(r'\]\s*$', cleaned):
-                    clean_lyrics.append(cleaned) # Keep empty timestamps for timing
+                # 1. Strip structural labels: '[00:10.00] Verse 1' -> '[00:10.00]'
+                line = re.sub(r'(\[\d{2}:\d{2}\.\d{2}\])\s*(Verse|Chorus|Intro|Outro|Bridge|Solo|Hook|Header).*', r'\1', line, flags=re.IGNORECASE)
+                
+                # 2. Only keep lines with actual text to prevent 'Unknown Language' error
+                # Forced space after ] is critical for DiffRhythm's tokenizer
+                if re.search(r'\]\s*\S+', line):
+                    # Ensure single space after bracket ]
+                    line = re.sub(r'\]\s*', r'] ', line)
+                    clean_lyrics.append(line.strip())
             
-            lyrics_file.write_text('\n'.join(clean_lyrics))
+            final_lrc = '\n'.join(clean_lyrics)
+            lyrics_file.write_text(final_lrc)
             
-            # S-Rank Production Prompt:
-            # Using 'studio captured', 'vocal presence', and 'analog warmth' for realism.
-            enhanced_genre = f"{genre} music, studio captured dry vocals, close-up presence, high-end rhythmic precision, analog warmth, high fidelity"
+            print(f"📝 Processed LRC ({len(clean_lyrics)} lines)")
             
-            # Advanced Inference Parameters:
-            # Steps=60 for extreme clarity, CFG=4.5 for natural adherence.
-            # Removed --chunked to avoid phase jitter on A10G 24GB VRAM.
+            # Stable High-Quality Settings
+            enhanced_genre = f"{genre}, studio recording, clear dry vocals, steady rhythm, high fidelity"
             cmd = [
-                "python", "/root/DiffRhythm/infer/infer.py",
+                "python3", "/root/DiffRhythm/infer/infer.py",
                 "--lrc-path", str(lyrics_file),
                 "--audio-length", str(duration),
                 "--output-dir", str(tmpdir),
@@ -144,7 +138,7 @@ class DiffRhythmGenerator:
                 "--chunked"
             ]
             
-            print(f"Executing Deep production: steps=60, cfg=4.5, prompt={enhanced_genre}")
+            print(f"Executing DiffRhythm production...")
             
             result = subprocess.run(
                 cmd,
@@ -159,74 +153,70 @@ class DiffRhythmGenerator:
                 print(f"STDERR: {result.stderr}")
                 raise RuntimeError(f"DiffRhythm failed: {result.stderr}")
             
-            print(result.stdout)
-            
             # Find generated file
             generated_files = list(tmpdir.glob("*.wav"))
             if not generated_files:
-                print(f"No WAV files found in {tmpdir}")
-                print(f"Directory contents: {list(tmpdir.iterdir())}")
                 raise RuntimeError("No output file generated")
             
             output_file = generated_files[0]
-            print(f"📁 Found output: {output_file}")
-            
-            # Read audio bytes
             with open(output_file, "rb") as f:
                 audio_bytes = f.read()
         
         generation_time = time.time() - start_time
-        print(f"✅ Generated in {generation_time:.1f}s")
-        print(f"📊 Size: {len(audio_bytes) / 1024 / 1024:.2f} MB")
-        
+        print(f"✅ Generated in {generation_time:.1f}s (Size: {len(audio_bytes)/1024/1024:.2f} MB)")
         return audio_bytes
 
 
-@app.function(
-    image=image,
-    timeout=600,
-)
-def process_request(request_data: dict) -> bytes:
-    """
-    Process lyrics-to-song request.
+def get_lyrics_from_data(data: dict) -> str:
+    """Helper to extract lyrics from either 'lyrics' or 'structure' field."""
+    lyrics_text = data.get("lyrics", "")
+    structure = data.get("structure", [])
     
-    Args:
-        request_data: Request with lyrics, genre, duration
-        
-    Returns:
-        Audio bytes (WAV)
-    """
+    if structure:
+        lrc_lines = []
+        for section in structure:
+            start_str = section.get("start", "00:00.00")
+            time_match = re.search(r'(\d{2}):(\d{2}\.\d{2})', start_str)
+            
+            if time_match:
+                base_min = int(time_match.group(1))
+                base_sec = float(time_match.group(2))
+                base_total = base_min * 60 + base_sec
+                
+                lines = section.get("lines", [])
+                for i, line in enumerate(lines):
+                    # Auto-distribute lines with 4s gap
+                    line_total = base_total + (i * 4.0)
+                    m = int(line_total // 60)
+                    s = line_total % 60
+                    ts = f"[{m:02d}:{s:05.2f}] "
+                    lrc_lines.append(f"{ts}{line.strip()}")
+        return "\n".join(lrc_lines)
+    return lyrics_text
+
+
+@app.function(image=image, timeout=600)
+def process_request(request_data: dict) -> bytes:
+    """Process lyrics-to-song request."""
     try:
-        # Extract parameters
-        lyrics = request_data.get("lyrics")
+        # Extract and convert lyrics
+        lyrics = get_lyrics_from_data(request_data)
         genre = request_data.get("genre", "rock")
         duration = request_data.get("duration", 95)
         
-        # Validate
         if not lyrics:
-            raise ValueError("Lyrics are required")
+            raise ValueError("No lyrics or structure provided")
         
-        if len(lyrics) < 20:
-            raise ValueError("Lyrics too short (minimum 20 characters)")
+        # Duration normalization
+        duration = 285 if duration > 95 else 95
         
-        # DiffRhythm supports 95s or 285s
-        if duration <= 95:
-            duration = 95
-        else:
-            duration = 285
-        
-        # Generate song
+        # Generator call
         generator = DiffRhythmGenerator()
-        audio_bytes = generator.generate.remote(
+        return generator.generate.remote(
             lyrics=lyrics,
             genre=genre,
             duration=duration,
         )
-        
-        print(f"✅ Generated {genre} song with vocals")
-        
-        return audio_bytes
-        
     except Exception as e:
         print(f"❌ Error: {e}")
         import traceback
@@ -234,42 +224,24 @@ def process_request(request_data: dict) -> bytes:
         raise
 
 
-# Local test
 @app.local_entrypoint()
 def main():
-    """Test locally."""
-    
-    test_lyrics = """[00:00.00] Verse 1
-[00:05.00] Walking through the shadows of my mind
-[00:10.00] Searching for the truth I left behind
-[00:15.00] Every step I take feels so unclear
-[00:20.00] But I know that change is drawing near
-
-[00:25.00] Chorus
-[00:26.00] I will rise above the pain
-[00:30.00] Break these chains and start again
-[00:35.00] No more living in the past
-[00:40.00] This time I will make it last
-"""
-    
-    request = {
-        "request_id": "test_001",
-        "lyrics": test_lyrics,
-        "genre": "rock",
+    """Local test suite."""
+    test_request = {
+        "request_id": "test_local_01",
+        "genre": "indie rock",
         "duration": 95,
+        "structure": [
+            {
+                "type": "verse",
+                "start": "00:05.00",
+                "lines": ["The neon lights are fading fast", "Memory of a love that didn't last"]
+            }
+        ]
     }
-    
-    print("🎵 Testing DiffRhythm music generation...")
-    audio_bytes = process_request.remote(request)
-    
-    # Save to file
-    from pathlib import Path
-    output_dir = Path("output")
-    output_dir.mkdir(exist_ok=True)
-    
-    output_file = output_dir / "test_diffrhythm_001.wav"
-    with open(output_file, "wb") as f:
+    print("🎵 Testing optimized system...")
+    audio_bytes = process_request.remote(test_request)
+    Path("output").mkdir(exist_ok=True)
+    with open("output/test_local.wav", "wb") as f:
         f.write(audio_bytes)
-    
-    print(f"✅ Saved to: {output_file}")
-    print(f"📊 Size: {len(audio_bytes) / 1024 / 1024:.2f} MB")
+    print("✅ Completed local test")

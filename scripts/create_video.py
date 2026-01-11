@@ -124,6 +124,31 @@ def create_video(audio_path: str, image_path: str, srt_path: str, output_path: s
     print(f"✅ Video created: {output_path}")
 
 
+def get_lyrics_from_data(data: dict) -> str:
+    """Extract or generate LRC lyrics from request data."""
+    lyrics_text = data.get('lyrics', '')
+    structure = data.get('structure', [])
+    
+    if structure:
+        import re
+        lrc_lines = []
+        for section in structure:
+            start_str = section.get("start", "00:00.00")
+            time_match = re.search(r'(\d{2}):(\d{2}\.\d{2})', start_str)
+            if time_match:
+                base_min = int(time_match.group(1))
+                base_sec = float(time_match.group(2))
+                base_total = base_min * 60 + base_sec
+                lines = section.get("lines", [])
+                for i, line in enumerate(lines):
+                    line_total = base_total + (i * 4.0)
+                    m = int(line_total // 60)
+                    s = line_total % 60
+                    lrc_lines.append(f"[{m:02d}:{s:05.2f}] {line}")
+        return "\n".join(lrc_lines)
+    return lyrics_text
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: python create_video.py <request_json> <audio_file>")
@@ -136,11 +161,11 @@ if __name__ == "__main__":
     with open(request_json) as f:
         request_data = json.load(f)
     
-    lyrics = request_data.get('lyrics', '')
+    lyrics = get_lyrics_from_data(request_data)
     request_id = request_data.get('request_id', 'unknown')
     
     if not lyrics:
-        print("❌ No lyrics found in request")
+        print("❌ No lyrics or structure found in request")
         sys.exit(1)
     
     # Paths

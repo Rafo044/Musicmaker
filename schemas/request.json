@@ -3,9 +3,19 @@
   "title": "DiffRhythm Music Generation Request",
   "description": "Schema for lyrics-to-song generation with DiffRhythm - ONE JSON = ONE SONG WITH VOCALS",
   "type": "object",
-  "required": [
-    "request_id",
-    "lyrics"
+  "anyOf": [
+    {
+      "required": [
+        "request_id",
+        "lyrics"
+      ]
+    },
+    {
+      "required": [
+        "request_id",
+        "structure"
+      ]
+    }
   ],
   "properties": {
     "request_id": {
@@ -13,10 +23,37 @@
       "description": "Unique identifier for the request",
       "pattern": "^req_[a-zA-Z0-9_-]+$"
     },
+    "structure": {
+      "type": "array",
+      "description": "Song structure with timed sections",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "pattern": "^\\d{2}:\\d{2}\\.\\d{2}$"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "start",
+          "lines"
+        ]
+      }
+    },
     "lyrics": {
       "type": "string",
       "description": "Song lyrics in LRC format (with timestamps) or plain text",
-      "minLength": 20,
+      "minLength": 10,
       "maxLength": 5000
     },
     "genre": {
