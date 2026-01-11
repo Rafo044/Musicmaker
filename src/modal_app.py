@@ -139,9 +139,9 @@ class DiffRhythmGenerator:
                 "python", "/root/DiffRhythm/infer/infer.py",
                 "--lrc-path", str(lyrics_file),
                 "--audio-length", str(duration),
-                "--repo-id", "ASLP-lab/DiffRhythm-base",
                 "--output-dir", str(tmpdir),
-                "--ref-prompt", enhanced_genre
+                "--ref-prompt", enhanced_genre,
+                "--chunked"
             ]
             
             print(f"Executing Deep production: steps=60, cfg=4.5, prompt={enhanced_genre}")
