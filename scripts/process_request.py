@@ -21,8 +21,8 @@ def process_request(json_file: str):
     print(f"Processing request: {request_data.get('request_id')}")
     print(f"Genre: {request_data.get('genre', 'rock')}")
     
-    # Get Modal function
-    process_fn = modal.Function.lookup("musicmaker-diffrhythm", "process_request")
+    # Get Modal function (new API)
+    process_fn = modal.Function.from_name("musicmaker-diffrhythm", "process_request")
     
     # Call Modal function (returns audio bytes)
     print("🎤 Generating song with vocals...")
