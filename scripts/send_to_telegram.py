@@ -7,7 +7,9 @@ def send_to_telegram(token, chat_id, file_paths):
     """
     Fayllari Telegram botu vasitesile gonderir.
     """
-    base_url = f"https://api.telegram.org/bot{token}"
+    # Eger token 'bot' ile bashlayirsa, uni temizleyirik
+    clean_token = token[3:] if token.startswith('bot') else token
+    base_url = f"https://api.telegram.org/bot{clean_token}"
     
     for path in file_paths:
         p = Path(path)

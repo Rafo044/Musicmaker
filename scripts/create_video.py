@@ -86,20 +86,26 @@ def create_video(audio_path: str, image_path: str, srt_path: str, output_path: s
         srt_path: Path to SRT subtitles
         output_path: Output video path (MP4)
     """
+    # Ultra-clean ve minimalist shrift (Normal):
+    force_style = (
+        "FontName=Arial,"
+        "FontSize=18,"
+        "PrimaryColour=&HFFFFFF&,"
+        "OutlineColour=&H222222&,"  # Chox ince boz outlines
+        "BorderStyle=1,"
+        "Outline=0.5,"               # Demek olar ki gorunmez outline
+        "Shadow=0,"
+        "Alignment=2,"
+        "MarginV=25"
+    )
+    
     cmd = [
-        'ffmpeg',
-        '-loop', '1',
-        '-i', image_path,
+        'ffmpeg', '-loop', '1', '-i', image_path,
         '-i', audio_path,
-        '-vf', f"subtitles={srt_path}:force_style='FontName=Arial,FontSize=24,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=3,Outline=2,Shadow=1,Alignment=2,MarginV=50'",
-        '-c:v', 'libx264',
-        '-tune', 'stillimage',
-        '-c:a', 'aac',
-        '-b:a', '192k',
-        '-pix_fmt', 'yuv420p',
-        '-shortest',
-        '-y',
-        output_path
+        '-vf', f"subtitles={srt_path}:force_style='{force_style}'",
+        '-c:v', 'libx264', '-tune', 'stillimage',
+        '-c:a', 'aac', '-b:a', '192k',
+        '-pix_fmt', 'yuv420p', '-shortest', '-y', output_path
     ]
     
     print(f"🎬 Creating video with FFmpeg...")

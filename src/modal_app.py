@@ -122,11 +122,12 @@ class DiffRhythmGenerator:
                 "--chunked",  # Enable chunked decoding for VRAM efficiency
             ]
             
-            # Add quality tags to reference prompt
-            enhanced_genre = f"{genre} music, studio recording, high fidelity, clear dry vocals, close microphone, professional mastering, no reverb"
+            # Research-based Golden Prompt for natural studio sound:
+            # Avoids 'no reverb' (which can confuse), uses 'dry' and 'close-up' instead.
+            enhanced_genre = f"{genre} music, garage rock style, dry studio vocals, close-up vocal recording, sharp electric guitar, rhythmic clarity"
             cmd.extend(["--ref-prompt", enhanced_genre])
             
-            print(f"Running command: {' '.join(cmd)}")
+            print(f"Running generation with natural prompt: {enhanced_genre}")
             
             result = subprocess.run(
                 cmd,
