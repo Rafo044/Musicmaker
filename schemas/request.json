@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DiffRhythm Music Generation Request",
+  "description": "Schema for lyrics-to-song generation with DiffRhythm - ONE JSON = ONE SONG WITH VOCALS",
+  "type": "object",
+  "required": [
+    "request_id",
+    "lyrics"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "description": "Unique identifier for the request",
+      "pattern": "^req_[a-zA-Z0-9_-]+$"
+    },
+    "lyrics": {
+      "type": "string",
+      "description": "Song lyrics in LRC format (with timestamps) or plain text",
+      "minLength": 20,
+      "maxLength": 5000
+    },
+    "genre": {
+      "type": "string",
+      "description": "Music genre/style",
+      "enum": [
+        "rock",
+        "metal",
+        "indie",
+        "pop",
+        "electronic",
+        "folk",
+        "jazz",
+        "blues",
+        "country",
+        "hip-hop",
+        "r&b",
+        "classical"
+      ],
+      "default": "rock"
+    },
+    "duration": {
+      "type": "integer",
+      "description": "Target duration (95s or 285s)",
+      "enum": [
+        95,
+        285
+      ],
+      "default": 95
+    }
+  }
+}

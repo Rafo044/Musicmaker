@@ -1,0 +1,72 @@
+name: Deploy Music Generation
+
+on:
+  push:
+    paths:
+      - 'requests/**.json'
+    branches:
+      - main
+
+jobs:
+  generate-music:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install modal pydantic jsonschema
+      
+      - name: Get changed JSON files
+        id: changed-files
+        run: |
+          echo "files=$(git diff --name-only HEAD~1 HEAD | grep 'requests/.*\.json$' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+      
+      - name: Validate JSON schemas
+        run: |
+          for file in ${{ steps.changed-files.outputs.files }}; do
+            echo "Validating $file"
+            python scripts/validate_request.py "$file"
+          done
+      
+      - name: Deploy to Modal
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET
+          modal deploy src/modal_app.py
+      
+      - name: Process requests
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          for file in ${{ steps.changed-files.outputs.files }}; do
+            echo "Processing $file"
+            python scripts/process_request.py "$file"
+          done
+      
+      - name: Upload generated music
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: music-${{ github.run_id }}
+          path: output/*.wav
+          retention-days: 90
+      
+      - name: Output results
+        if: always()
+        run: |
+          echo "✅ Workflow completed"
+          echo "📦 Music files uploaded as artifacts"
+          echo "Download: Actions → This workflow → Artifacts"

@@ -1,0 +1,37 @@
+# Musicmaker Configuration - DiffRhythm (LYRICS TO SONG)
+
+# Model settings
+model:
+  name: "ASLP-lab/DiffRhythm-base"
+  type: "lyrics-to-song"
+  vae: "ASLP-lab/DiffRhythm-vae"
+  supported_durations: [95, 285]  # seconds
+  sample_rate: 44100
+  output_format: "wav"
+
+# Modal.com settings
+modal:
+  gpu: "A10G"  # 24GB VRAM
+  timeout: 600  # 10 dəqiqə
+  retries: 3
+
+# Error handling
+error_handling:
+  max_retries: 3
+  retry_delay: 5
+  exponential_backoff: true
+
+# Supported genres
+genres:
+  - rock
+  - metal
+  - indie
+  - pop
+  - electronic
+  - folk
+  - jazz
+  - blues
+  - country
+  - hip-hop
+  - r&b
+  - classical
