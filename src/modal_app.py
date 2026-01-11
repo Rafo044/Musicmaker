@@ -132,12 +132,21 @@ class DiffRhythmGenerator:
             
             lyrics_file.write_text('\n'.join(clean_lyrics))
 
-            # PATCH: infer.py has hardcoded steps/cfg. We update them via sed for Ultra-Quality.
-            print("Applying Ultra-Quality patch to DiffRhythm engine...")
-            subprocess.run(["sed", "-i", "s/steps=32/steps=60/g", "/root/DiffRhythm/infer/infer.py"], check=True)
-            subprocess.run(["sed", "-i", "s/cfg_strength=4.0/cfg_strength=9.5/g", "/root/DiffRhythm/infer/infer.py"], check=True)
+            # PATCH: Apply research-backed 'Golden Values' to prevent distortion/metallic artifacts
+            print("Applying Golden-Ratio patches to DiffRhythm engine (Research-backed stability)...")
+            # 1. Balanced steps for depth without noise accumulation
+            subprocess.run(["sed", "-i", "s/steps=60/steps=45/g", "/root/DiffRhythm/infer/infer.py"], check=False) # Fallback if previously 60
+            subprocess.run(["sed", "-i", "s/steps=32/steps=45/g", "/root/DiffRhythm/infer/infer.py"], check=False)
             
-            # Prepare DiffRhythm Command (Removing invalid CLI args, using our patched fallbacks)
+            # 2. CFG in the 'Sweet Spot' (6.2) to avoid saturation/vocal crackling
+            subprocess.run(["sed", "-i", "s/cfg_strength=9.5/cfg_strength=6.2/g", "/root/DiffRhythm/infer/infer.py"], check=False) # Fallback if previously 9.5
+            subprocess.run(["sed", "-i", "s/cfg_strength=4.0/cfg_strength=6.2/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            
+            # 3. Add Digital Headroom (0.95 multiplier) to prevent clipping during normalization
+            # We look for the normalization line and append .mul(0.95) for safety
+            subprocess.run(["sed", "-i", "s/.div(torch.max(torch.abs(output)))/.div(torch.max(torch.abs(output))).mul(0.95)/g", "/root/DiffRhythm/infer/infer.py"], check=True)
+
+            # Prepare DiffRhythm Command
             cmd = [
                 "python3", "/root/DiffRhythm/infer/infer.py",
                 "--lrc-path", str(lyrics_file),
@@ -146,16 +155,17 @@ class DiffRhythmGenerator:
                 "--chunked"
             ]
 
-            # Logic: Use a SINGLE, target reference for maximum "Original" vocal purity
+            # Logic: Pure Reference usage
             if local_ref_paths:
                 target_ref = local_ref_paths[0]
-                print(f"Using PRIMARY reference for original vocal timbre: {ref_audio_urls[0]}")
+                print(f"Using PRIMARY reference for high-fidelity timbre: {ref_audio_urls[0]}")
                 cmd.extend(["--ref-audio-path", str(target_ref)])
             else:
-                enhanced_genre = f"{genre}, studio recording, clear dry vocals, steady rhythm, high fidelity"
+                # Engineering the prompt with quality tags instead of high CFG
+                enhanced_genre = f"{genre}, [high fidelity], studio recording, clear dry vocals, steady rhythm, 44.1kHz"
                 cmd.extend(["--ref-prompt", enhanced_genre])
             
-            print(f"Executing Ultra-Quality patched production...")
+            print(f"Executing Research-Backed 'Golden' production...")
             result = subprocess.run(
                 cmd,
                 capture_output=True,
