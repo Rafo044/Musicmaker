@@ -20,9 +20,8 @@ def validate_lrc_format(lyrics: str) -> tuple[bool, list[str]]:
     for i, line in enumerate(lines, 1):
         line = line.strip()
         
-        # Skip empty lines
+        # Skip truly empty lines (DiffRhythm will ignore them)
         if not line:
-            errors.append(f"Line {i}: Empty line detected (DiffRhythm doesn't support empty lines)")
             continue
         
         # Check LRC format
@@ -36,10 +35,7 @@ def validate_lrc_format(lyrics: str) -> tuple[bool, list[str]]:
             errors.append(f"Line {i}: Invalid timestamp format - '{line[:30]}...'")
             continue
         
-        # Check if there's text after timestamp
-        text = line[line.index(']')+1:].strip()
-        if not text:
-            errors.append(f"Line {i}: Empty text after timestamp")
+        # Note: We allow empty text after timestamps for instrumental/silence parts.
     
     return len(errors) == 0, errors
 
