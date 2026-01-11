@@ -31,7 +31,7 @@ jobs:
           echo "Searching for the most recent 'output-*' artifact in the repository..."
           
           # Get the latest artifact that matches the 'output-' prefix
-          ARTIFACT_JSON=$(gh api /repos/${{ github.repository }}/actions/artifacts --query 'artifacts | map(select(.name | startswith("output-"))) | sort_by(.created_at) | reverse | .[0]')
+          ARTIFACT_JSON=$(gh api /repos/${{ github.repository }}/actions/artifacts -q '.artifacts | map(select(.name | startswith("output-"))) | sort_by(.created_at) | reverse | .[0]')
           
           if [ "$ARTIFACT_JSON" == "null" ] || [ -z "$ARTIFACT_JSON" ]; then
             echo "Error: No 'output-*' artifacts found in this repository."
