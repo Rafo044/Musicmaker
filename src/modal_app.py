@@ -185,7 +185,7 @@ class DiffRhythmGenerator:
             
             with open(generated_files[0], "rb") as f:
                 audio_bytes = f.read()
-        
+        print(f"✅ Generation Completed (Size: {len(audio_bytes)/1024/1024:.2f} MB)")
         return audio_bytes
 
 
