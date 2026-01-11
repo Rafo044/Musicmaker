@@ -118,7 +118,6 @@ class DiffRhythmGenerator:
                 "python3", "/root/DiffRhythm/infer/infer.py",
                 "--lrc-path", str(lyrics_file),
                 "--audio-length", str(duration),
-                "--repo-id", "ASLP-lab/DiffRhythm-base",
                 "--output-dir", str(tmpdir),
                 "--chunked",  # Enable chunked decoding for VRAM efficiency
             ]
