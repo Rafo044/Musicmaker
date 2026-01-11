@@ -5,61 +5,52 @@ import sys
 import json
 import os
 from pathlib import Path
-from google.oauth2 import service_account
+import google.auth.transport.requests
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-
-def upload_to_drive(file_path: str, folder_id: str, credentials_json: str):
-    """
-    Upload file to Google Drive.
+def upload_to_drive(file_path: str, folder_id: str):
+    """Upload using OAuth2 Refresh Token."""
     
-    Args:
-        file_path: Path to file to upload
-        folder_id: Google Drive folder ID
-        credentials_json: Service account credentials (JSON string)
+    # GitHub Secrets-dən gələn məlumatlar
+    client_id = os.getenv('GDRIVE_CLIENT_ID')
+    client_secret = os.getenv('GDRIVE_CLIENT_SECRET')
+    refresh_token = os.getenv('GDRIVE_REFRESH_TOKEN')
     
-    Returns:
-        File ID and shareable link
-    """
-    # Parse credentials
-    credentials_dict = json.loads(credentials_json)
-    
-    # Create credentials
-    credentials = service_account.Credentials.from_service_account_info(
-        credentials_dict,
+    creds = Credentials(
+        None,
+        refresh_token=refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=client_id,
+        client_secret=client_secret,
         scopes=['https://www.googleapis.com/auth/drive.file']
     )
     
-    # Build Drive service
-    service = build('drive', 'v3', credentials=credentials)
+    # Refresh token if expired
+    if creds.expired:
+        creds.refresh(google.auth.transport.requests.Request())
+
+    service = build('drive', 'v3', credentials=creds)
     
-    # File metadata
     file_name = Path(file_path).name
     file_metadata = {
         'name': file_name,
         'parents': [folder_id]
     }
     
-    # Upload file
     media = MediaFileUpload(file_path, resumable=True)
     
-    print(f"📤 Uploading {file_name} to Google Drive...")
+    print(f"📤 Uploading {file_name} as your user account...")
     
     file = service.files().create(
         body=file_metadata,
         media_body=media,
-        fields='id, webViewLink, webContentLink'
+        fields='id, webViewLink'
     ).execute()
     
-    file_id = file.get('id')
-    web_view_link = file.get('webViewLink')
-    
-    print(f"✅ Upload successful!")
-    print(f"📁 File ID: {file_id}")
-    print(f"🔗 Link: {web_view_link}")
-    
-    return file_id, web_view_link
+    print(f"✅ Uğurla sənin Drive-na yükləndi!")
+    return file.get('id'), file.get('webViewLink')
 
 
 if __name__ == "__main__":
