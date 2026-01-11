@@ -61,11 +61,13 @@ if __name__ == "__main__":
     file_path = sys.argv[1]
     
     # Get credentials from environment
-    credentials_json = os.getenv('GOOGLE_DRIVE_CREDENTIALS')
+    client_id = os.getenv('GDRIVE_CLIENT_ID')
+    client_secret = os.getenv('GDRIVE_CLIENT_SECRET')
+    refresh_token = os.getenv('GDRIVE_REFRESH_TOKEN')
     folder_id = os.getenv('GOOGLE_DRIVE_FOLDER_ID')
     
-    if not credentials_json:
-        print("❌ Error: GOOGLE_DRIVE_CREDENTIALS not set")
+    if not all([client_id, client_secret, refresh_token]):
+        print("❌ Error: Google Drive OAuth2 credentials (ID, Secret, or Refresh Token) not set")
         sys.exit(1)
     
     if not folder_id:
@@ -77,7 +79,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     try:
-        file_id, link = upload_to_drive(file_path, folder_id, credentials_json)
+        file_id, link = upload_to_drive(file_path, folder_id)
         
         # Save link to file for GitHub Actions
         output_dir = Path("output")

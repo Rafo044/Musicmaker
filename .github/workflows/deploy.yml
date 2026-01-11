@@ -85,11 +85,18 @@ jobs:
           sudo apt-get update && sudo apt-get install -y ffmpeg
           for file in ${{ steps.changed-files.outputs.files }}; do
             if [ -f "$file" ]; then
-              request_id=$(basename "$file" .json)
-              audio_file="output/${request_id}"*.wav
-              if [ -f $audio_file ]; then
-                echo "Creating video for $request_id..."
-                python3 scripts/create_video.py "$file" $audio_file
+              # Get request_id from inside the JSON
+              request_id=$(python3 -c "import json; print(json.load(open('$file'))['request_id'])")
+              echo "Processing video for Request ID: $request_id"
+              
+              # Find the actual wav file generated for this ID
+              audio_file=$(ls output/${request_id}*.wav | head -n 1)
+              
+              if [ -f "$audio_file" ]; then
+                echo "Found audio: $audio_file. Generating video..."
+                python3 scripts/create_video.py "$file" "$audio_file"
+              else
+                echo "⚠️  Audio file for $request_id not found in output/ folder."
               fi
             fi
           done
