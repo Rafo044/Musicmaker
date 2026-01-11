@@ -23,28 +23,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Resolve Run ID
+      - name: Resolve Latest Artifact
         id: resolve
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RUN_ID="${{ github.event.inputs.run_id }}"
-          if [ -z "$RUN_ID" ]; then
-            RUN_ID="${{ github.event.workflow_run.id }}"
-          fi
+          echo "Searching for the most recent 'output-*' artifact in the repository..."
           
-          if [ -z "$RUN_ID" ]; then
-            echo "No Run ID provided. Finding latest successful 'Deploy Music Generation' run..."
-            RUN_ID=$(gh run list --workflow "Deploy Music Generation" --status success --limit 1 --json databaseId --jq '.[0].databaseId')
-          fi
+          # Get the latest artifact that matches the 'output-' prefix
+          ARTIFACT_JSON=$(gh api /repos/${{ github.repository }}/actions/artifacts --query 'artifacts | map(select(.name | startswith("output-"))) | sort_by(.created_at) | reverse | .[0]')
           
-          if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
-            echo "Error: Could not find a valid Run ID to sync."
+          if [ "$ARTIFACT_JSON" == "null" ] || [ -z "$ARTIFACT_JSON" ]; then
+            echo "Error: No 'output-*' artifacts found in this repository."
             exit 1
           fi
           
-          echo "Using Run ID: $RUN_ID"
-          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+          ARTIFACT_NAME=$(echo "$ARTIFACT_JSON" | jq -r '.name')
+          ARTIFACT_RUN_ID=$(echo "$ARTIFACT_JSON" | jq -r '.workflow_run.id')
+          
+          echo "Found Artifact: $ARTIFACT_NAME from Run: $ARTIFACT_RUN_ID"
+          echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          echo "run_id=$ARTIFACT_RUN_ID" >> $GITHUB_OUTPUT
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -59,7 +58,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           run-id: ${{ steps.resolve.outputs.run_id }}
-          name: output-${{ steps.resolve.outputs.run_id }}
+          name: ${{ steps.resolve.outputs.artifact_name }}
           path: output/
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
