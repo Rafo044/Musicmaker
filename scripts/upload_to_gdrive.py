@@ -30,24 +30,38 @@ def get_gdrive_service():
 
     return build("drive", "v3", credentials=creds)
 
+def check_file_exists(service, name, folder_id):
+    """Check if a file with the same name exists in the target folder."""
+    query = f"nameSelection = '{name}' and '{folder_id}' in parents and trashed = false"
+    # Note: Using simple name check. In Drive v3, the field is 'name'.
+    query = f"name = '{name}' and '{folder_id}' in parents and trashed = false"
+    response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+    return response.get('files', [])
+
 def upload_files(folder_id, local_dir="output"):
-    """Upload all files from local_dir to Google Drive folder."""
+    """Upload all files from local_dir to Google Drive if they don't exist."""
     service = get_gdrive_service()
     if not service:
         return
 
     output_path = Path(local_dir)
     if not output_path.exists():
-        print(f"Warning: Directory {local_dir} exist.")
+        print(f"Warning: Directory {local_dir} does not exist.")
         return
 
-    files_to_upload = list(output_path.glob("*.wav")) + list(output_path.glob("*.mp4"))
+    files_to_upload = list(output_path.glob("**.wav")) + list(output_path.glob("**.mp4"))
     
     if not files_to_upload:
         print("No files found to upload.")
         return
 
     for file_path in files_to_upload:
+        # Check if already exists to ensure sync logic
+        existing_files = check_file_exists(service, file_path.name, folder_id)
+        if existing_files:
+            print(f"Skipping {file_path.name} (already exists on Drive)")
+            continue
+
         print(f"Uploading {file_path.name}...")
         
         file_metadata = {

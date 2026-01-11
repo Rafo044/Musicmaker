@@ -1,6 +1,11 @@
 name: Upload to Google Drive
 
 on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Run ID to download artifacts from (optional)'
+        required: false
   workflow_run:
     workflows: ["Deploy Music Generation"]
     types:
@@ -24,13 +29,17 @@ jobs:
         run: |
           pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
       
-      - name: Download artifacts from previous workflow
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: output-${{ github.event.workflow_run.id }}
+          # Prefer manual input run_id, then triggering workflow_run ID
+          run-id: ${{ github.event.inputs.run_id || github.event.workflow_run.id }}
+          # The pattern used in deploy.yml is output-${run_id}. 
+          # If we don't know the exact name, we can try to find it or use a pattern.
+          # Here we assume the name matches the run_id used.
+          name: output-${{ github.event.inputs.run_id || github.event.workflow_run.id }}
           path: output/
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Upload to Google Drive
         env:
