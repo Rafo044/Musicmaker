@@ -86,18 +86,19 @@ def create_video(audio_path: str, image_path: str, srt_path: str, output_path: s
         srt_path: Path to SRT subtitles
         output_path: Output video path (MP4)
     """
-    # Yuksek keyfiyyetli ve temiz altyazi stili:
-    # BorderStyle=1 (Outline), Outline=1.2, Shadow=0 (Daha muasir gorunush)
+    # High-End Cinematic Subtitle Style (Minimalist & Professional):
+    # BorderStyle=1, Thin Outline (0.5), Soft Shadow (0.5), Semi-transparent Outline.
     force_style = (
         "FontName=Arial,"
-        "FontSize=22,"
-        "PrimaryColour=&HFFFFFF&,"
-        "OutlineColour=&H000000&,"
+        "FontSize=18,"
+        "PrimaryColour=&H00FFFFFF&,"   # Solid White
+        "OutlineColour=&H66222222&,"   # Semi-transparent dark grey outline
         "BorderStyle=1,"
-        "Outline=1.2,"
-        "Shadow=0,"
+        "Outline=0.5,"
+        "Shadow=0.5,"
+        "ShadowColour=&H88000000&,"
         "Alignment=2,"
-        "MarginV=35"
+        "MarginV=60"                    # Balanced lower third
     )
     
     cmd = [
@@ -105,9 +106,9 @@ def create_video(audio_path: str, image_path: str, srt_path: str, output_path: s
         '-i', audio_path,
         '-vf', f"subtitles={srt_path}:force_style='{force_style}'",
         '-c:v', 'libx264', '-tune', 'stillimage',
-        '-c:a', 'aac', '-b:a', '192k',
+        '-c:a', 'aac', '-b:a', '256k', # Higher audio bitrate for MP4
         '-pix_fmt', 'yuv420p',
-        '-sn',  # BU CHOX VACIBDIR: Ikinci altyazinin yaranmasinin qarshisini alir
+        '-sn',  # Kill embedded subs to prevent doubling
         '-shortest', '-y', output_path
     ]
     

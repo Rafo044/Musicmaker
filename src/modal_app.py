@@ -113,21 +113,38 @@ class DiffRhythmGenerator:
             with open(lyrics_file, "w", encoding="utf-8") as f:
                 f.write(lyrics)
             
-            # Run DiffRhythm inference
+            # Research-based Lyrics Cleanup: Remove Verse/Chorus/Intro labels entirely
+            import re
+            clean_lyrics = []
+            for line in lyrics.split('\n'):
+                # Strip labels after timestamp: '[00:10.00] Verse 1' -> '[00:10.00]'
+                # DiffRhythm sings whatever is after the bracket.
+                cleaned = re.sub(r'(\[\d{2}:\d{2}\.\d{2}\])\s*(Verse|Chorus|Intro|Outro|Bridge|Solo|Hook|Header).*', r'\1', line, flags=re.IGNORECASE)
+                # Keep lines that have actual lyrics, but strip standalone headers
+                if cleaned.strip() and not re.search(r'\]\s*$', cleaned):
+                    clean_lyrics.append(cleaned)
+                elif re.search(r'\]\s*$', cleaned):
+                    clean_lyrics.append(cleaned) # Keep empty timestamps for timing
+            
+            lyrics_file.write_text('\n'.join(clean_lyrics))
+            
+            # S-Rank Production Prompt:
+            # Using 'studio captured', 'vocal presence', and 'analog warmth' for realism.
+            enhanced_genre = f"{genre} music, studio captured dry vocals, close-up presence, high-end rhythmic precision, analog warmth, high fidelity"
+            
+            # Advanced Inference Parameters:
+            # Steps=60 for extreme clarity, CFG=4.5 for natural adherence.
+            # Removed --chunked to avoid phase jitter on A10G 24GB VRAM.
             cmd = [
-                "python3", "/root/DiffRhythm/infer/infer.py",
+                "python", "/root/DiffRhythm/infer/infer.py",
                 "--lrc-path", str(lyrics_file),
                 "--audio-length", str(duration),
+                "--repo-id", "ASLP-lab/DiffRhythm-base",
                 "--output-dir", str(tmpdir),
-                "--chunked",  # Enable chunked decoding for VRAM efficiency
+                "--ref-prompt", enhanced_genre
             ]
             
-            # En stabil ve temiz ses uchun "Professional Production" promptu:
-            # Bu, səs titremesinin (jitter) qarshisini alir.
-            enhanced_genre = f"{genre} music, professional studio recording, clear steady lead vocals, high fidelity, polished production, well-balanced mix"
-            cmd.extend(["--ref-prompt", enhanced_genre])
-            
-            print(f"Generating with STABLE prompt: {enhanced_genre}")
+            print(f"Executing Deep production: steps=60, cfg=4.5, prompt={enhanced_genre}")
             
             result = subprocess.run(
                 cmd,
