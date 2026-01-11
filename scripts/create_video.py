@@ -86,17 +86,18 @@ def create_video(audio_path: str, image_path: str, srt_path: str, output_path: s
         srt_path: Path to SRT subtitles
         output_path: Output video path (MP4)
     """
-    # Ultra-clean ve minimalist shrift (Normal):
+    # Yuksek keyfiyyetli ve temiz altyazi stili:
+    # BorderStyle=1 (Outline), Outline=1.2, Shadow=0 (Daha muasir gorunush)
     force_style = (
         "FontName=Arial,"
-        "FontSize=18,"
+        "FontSize=22,"
         "PrimaryColour=&HFFFFFF&,"
-        "OutlineColour=&H222222&,"  # Chox ince boz outlines
+        "OutlineColour=&H000000&,"
         "BorderStyle=1,"
-        "Outline=0.5,"               # Demek olar ki gorunmez outline
+        "Outline=1.2,"
         "Shadow=0,"
         "Alignment=2,"
-        "MarginV=25"
+        "MarginV=35"
     )
     
     cmd = [
@@ -105,7 +106,9 @@ def create_video(audio_path: str, image_path: str, srt_path: str, output_path: s
         '-vf', f"subtitles={srt_path}:force_style='{force_style}'",
         '-c:v', 'libx264', '-tune', 'stillimage',
         '-c:a', 'aac', '-b:a', '192k',
-        '-pix_fmt', 'yuv420p', '-shortest', '-y', output_path
+        '-pix_fmt', 'yuv420p',
+        '-sn',  # BU CHOX VACIBDIR: Ikinci altyazinin yaranmasinin qarshisini alir
+        '-shortest', '-y', output_path
     ]
     
     print(f"🎬 Creating video with FFmpeg...")
