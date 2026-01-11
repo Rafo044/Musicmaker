@@ -64,7 +64,8 @@ def upload_files(folder_id, local_dir="output"):
         print(f"Warning: Directory {local_dir} does not exist.")
         return
 
-    files_to_upload = list(output_path.glob("**.wav")) + list(output_path.glob("**.mp4"))
+    # Use rglob for recursive searching (correct way for pathlib)
+    files_to_upload = list(output_path.rglob("*.wav")) + list(output_path.rglob("*.mp4"))
     
     if not files_to_upload:
         print("No files found to upload.")
