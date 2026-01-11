@@ -58,30 +58,12 @@
     },
     "genre": {
       "type": "string",
-      "description": "Music genre/style",
-      "enum": [
-        "rock",
-        "metal",
-        "indie",
-        "pop",
-        "electronic",
-        "folk",
-        "jazz",
-        "blues",
-        "country",
-        "hip-hop",
-        "r&b",
-        "classical"
-      ],
+      "description": "Music genre/style or detailed style prompt",
       "default": "rock"
     },
     "duration": {
       "type": "integer",
       "description": "Target duration (95s or 285s)",
-      "enum": [
-        95,
-        285
-      ],
       "default": 95
     }
   }
