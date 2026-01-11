@@ -70,7 +70,20 @@ jobs:
             python3 scripts/process_request.py "$file"
           done
       
-      - name: Upload generated music
+      - name: Upload to Google Drive
+        if: success() && steps.check-files.outputs.has_files == 'true'
+        env:
+          GOOGLE_DRIVE_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_API }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        run: |
+          for file in output/*.wav; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file to Google Drive..."
+              python3 scripts/upload_to_drive.py "$file"
+            fi
+          done
+      
+      - name: Upload generated music (Backup)
         if: success() && steps.check-files.outputs.has_files == 'true'
         uses: actions/upload-artifact@v4
         with:
