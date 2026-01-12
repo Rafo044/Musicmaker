@@ -1,83 +1,79 @@
-"""Modal.com deployment for DiffRhythm - LYRICS TO SONG WITH VOCALS."""
 
-import modal
 import os
 import time
 import re
+from pathlib import Path
+import modal
 
-# Create Modal app
-app = modal.App("musicmaker-diffrhythm")
+# YuE Model Configuration
+# Stage 1: Music Language Modeling (LLaMA-2 7B)
+S1_MODEL = "m-a-p/YuE-s1-7B-anneal-en-cot"
+# Stage 2: Acoustic Modeling (LLaMA-2 1B)
+S2_MODEL = "m-a-p/YuE-s2-1B-general"
 
-# Docker image with DiffRhythm dependencies
-image = (
-    modal.Image.debian_slim(python_version="3.11")
-    .apt_install(
-        "git",
-        "ffmpeg",
-        "espeak-ng",  # Required for DiffRhythm
-    )
-    .run_commands(
-        "git clone https://github.com/ASLP-lab/DiffRhythm.git /root/DiffRhythm",
-        "cd /root/DiffRhythm && pip install -r requirements.txt",
-    )
+# Define Modal App
+app = modal.App("musicmaker-yue")
+
+# Shared Volume for Model Cache
+volume = modal.Volume.from_name("yue-models", create_if_missing=True)
+
+# Docker Image setup with YuE dependencies
+yue_image = (
+    modal.Image.from_registry("nvidia/cuda:12.1.0-devel-ubuntu22.04", add_python="3.10")
+    .apt_install("git", "ffmpeg")
     .pip_install(
-        "huggingface_hub>=0.20.0",
-        "pydantic>=2.0.0",
+        "torch",
+        "transformers",
+        "accelerate",
+        "sentencepiece",
+        "einops",
+        "omegaconf",
+        "librosa",
+        "soundfile",
+        "pyyaml",
+        "jsonschema",
+        "requests",
+    )
+    # Install X-Codec2
+    .run_commands(
+        "git clone https://github.com/HKUST-KnowComp/X-Codec2.git /root/X-Codec2",
+        "cd /root/X-Codec2 && pip install -e .",
+    )
+    # Install flash-attn
+    .run_commands(
+        "pip install flash-attn --no-build-isolation"
+    )
+    # Clone YuE repository
+    .run_commands(
+        "git clone https://github.com/multimodal-art-projection/YuE.git /root/YuE"
     )
 )
-
-# Volume for model weights
-volume = modal.Volume.from_name("diffrhythm-models", create_if_missing=True)
-
 
 @app.cls(
-    gpu="A10G",  # 24GB VRAM
-    image=image,
+    image=yue_image,
+    gpu="A100", # YuE-s1-7B requires A100 for high-context or fast inference
     volumes={"/models": volume},
-    timeout=600,
-    retries=3,
+    timeout=1200, # YuE generation is slower, allow 20 mins
 )
-class DiffRhythmGenerator:
-    """DiffRhythm model wrapper for lyrics-to-song generation."""
-    
+class YuEGenerator:
+    def __init__(self):
+        self.s1_path = Path("/models/s1")
+        self.s2_path = Path("/models/s2")
+
     @modal.enter()
-    def load_model(self):
-        """Load/download model on container startup."""
+    def download_models(self):
         from huggingface_hub import snapshot_download
-        from pathlib import Path
-        import sys
         
-        sys.path.append("/root/DiffRhythm")
-        
-        print("🎵 Loading DiffRhythm model...")
-        
-        # Model paths in volume
-        self.model_base_path = Path("/models/diffrhythm-base")
-        self.model_vae_path = Path("/models/diffrhythm-vae")
-        
-        # Download models if not exists
-        if not self.model_base_path.exists():
-            print("📥 Downloading DiffRhythm-base model...")
-            snapshot_download(
-                repo_id="ASLP-lab/DiffRhythm-base",
-                local_dir=str(self.model_base_path),
-                ignore_patterns=["*.md", "*.txt"],
-            )
-            volume.commit()  # Save to volume
-            print("✅ DiffRhythm-base downloaded")
-        
-        if not self.model_vae_path.exists():
-            print("📥 Downloading DiffRhythm-vae model...")
-            snapshot_download(
-                repo_id="ASLP-lab/DiffRhythm-vae",
-                local_dir=str(self.model_vae_path),
-                ignore_patterns=["*.md", "*.txt"],
-            )
-            volume.commit()  # Save to volume
-            print("✅ DiffRhythm-vae downloaded")
-        
-        print("✅ DiffRhythm ready")
-    
+        if not self.s1_path.exists():
+            print(f"📥 Downloading YuE Stage 1 ({S1_MODEL})...")
+            snapshot_download(S1_MODEL, local_dir=self.s1_path)
+            volume.commit()
+            
+        if not self.s2_path.exists():
+            print(f"📥 Downloading YuE Stage 2 ({S2_MODEL})...")
+            snapshot_download(S2_MODEL, local_dir=self.s2_path)
+            volume.commit()
+
     @modal.method()
     def generate(
         self,
@@ -87,212 +83,108 @@ class DiffRhythmGenerator:
         ref_audio_urls: list = None,
     ) -> bytes:
         """
-        Generate full song from lyrics with optional reference audios.
+        Produce a full song using YuE (樂) model.
         """
         import subprocess
         import tempfile
-        import requests
         from pathlib import Path
         
-        start_time = time.time()
-        ref_audio_urls = ref_audio_urls or []
+        print(f"� YuE Generating: {genre} ({duration}s)")
         
-        print(f"🎤 Generating {genre} song ({duration}s) with {len(ref_audio_urls)} references")
-        
-        with tempfile.TemporaryDirectory() as tmp_root:
-            tmp_root = Path(tmp_root)
-            refs_dir = tmp_root / "refs"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            
+            # 1. Prepare Lyrics and Genre text files (YuE requirement)
+            # YuE expects a specific format for lyrics [verse] [chorus]
+            lyrics_processed = self._process_lyrics(lyrics)
+            lyrics_file = tmp_root / "lyrics.txt"
+            lyrics_file.write_text(lyrics_processed)
+            
+            genre_file = tmp_root / "genre.txt"
+            # Enhance genre with benchmark quality tags
+            enhanced_genre = f"{genre}. [warm analog tone, mid-range focus, vintage tube compression, thick organic bass, professional mixing]"
+            genre_file.write_text(enhanced_genre)
+            
             output_dir = tmp_root / "output"
-            refs_dir.mkdir()
             output_dir.mkdir()
-            
-            lyrics_file = tmp_root / "lyrics.lrc"
-            
-            # Download reference audios to refs_dir
-            local_ref_paths = []
-            for i, url in enumerate(ref_audio_urls):
-                try:
-                    ref_path = refs_dir / f"ref_{i}.wav"
-                    print(f"Downloading reference style: {url}")
-                    resp = requests.get(url, timeout=10)
-                    if resp.status_code == 200:
-                        ref_path.write_bytes(resp.content)
-                        local_ref_paths.append(ref_path)
-                except Exception as e:
-                    print(f"Warning: Failed to download style ref {url}: {e}")
 
-            # Clean lyrics logic
-            clean_lyrics = []
-            for line in lyrics.split('\n'):
-                line = re.sub(r'(\[\d{2}:\d{2}\.\d{2}\])\s*(Verse|Chorus|Intro|Outro|Bridge|Solo|Hook|Header).*', r'\1', line, flags=re.IGNORECASE)
-                if re.search(r'\]\s*\S+', line):
-                    # Ensure single space after bracket ]
-                    line = re.sub(r'\]\s*', r'] ', line)
-                    clean_lyrics.append(line.strip())
+            # YuE Inference Command logic
+            # Stage 1 + Stage 2 combined usually in infer.py
+            print("🚀 Starting YuE Dual-Stage Inference...")
             
-            lyrics_file.write_text('\n'.join(clean_lyrics))
-
-            # PATCH: Apply Research-Backed 'Pure-Tone' Values (Fixing Hum & Clipping)
-            print("Applying Pure-Tone patches (Fixing Ugultu & Clipping)...")
-            # 1. RESEARCH-BACKED: Optimal steps (50) for natural transients (Avoids 100+ over-sharpening)
-            subprocess.run(["sed", "-i", "s/steps=45/steps=50/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/steps=32/steps=50/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/steps=64/steps=50/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/steps=100/steps=50/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            
-            # 2. RESEARCH-BACKED: CFG Scale = 5.5 for natural spectral centroid (~2900Hz)
-            # Higher CFG causes digital tension and pushes brightness to 4000Hz+
-            subprocess.run(["sed", "-i", "s/cfg_strength=6.2/cfg_strength=5.5/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/cfg_strength=4.0/cfg_strength=5.5/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/cfg_strength=6.5/cfg_strength=5.5/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/cfg_strength=7.0/cfg_strength=5.5/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/cfg_strength=8.0/cfg_strength=5.5/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/cfg_strength=9.0/cfg_strength=5.5/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/cfg_strength=5.8/cfg_strength=5.5/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            
-            # 3. RESEARCH-BACKED: Headroom Optimization (0.95) - Targeting -14dB professional loudness
-            subprocess.run(["sed", "-i", "s/.mul(0.95)//g", "/root/DiffRhythm/infer/infer.py"], check=False) # Clean old
-            subprocess.run(["sed", "-i", "s/.mul(0.85)//g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/.mul(0.92)//g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/.div(torch.max(torch.abs(output)))/.div(torch.max(torch.abs(output))).mul(0.95)/g", "/root/DiffRhythm/infer/infer.py"], check=True)
-
-            # Prepare DiffRhythm Command
             cmd = [
-                "python3", "/root/DiffRhythm/infer/infer.py",
-                "--lrc-path", str(lyrics_file),
-                "--audio-length", str(duration),
-                "--output-dir", str(output_dir),
-                "--chunked"
+                "python3", "/root/YuE/inference/infer.py",
+                "--stage1_model", str(self.s1_path),
+                "--stage2_model", str(self.s2_path),
+                "--genre_txt", str(genre_file),
+                "--lyrics_txt", str(lyrics_file),
+                "--run_n_segments", "2", # Default to 2 segments for testing
+                "--output_dir", str(output_dir),
+                "--cuda_idx", "0",
+                "--max_new_tokens", "3000"
             ]
 
-            # Logic: Pure Reference usage
-            if local_ref_paths:
-                target_ref = local_ref_paths[0]
-                print(f"Using PRIMARY reference for pure timbre: {ref_audio_urls[0]}")
-                cmd.extend(["--ref-audio-path", str(target_ref)])
-            else:
-                # RESEARCH-BACKED: Specific style-conditioning to match 110 BPM and warm 2900Hz Centroid
-                # keywords 'no digital hiss' and 'vintage tube' are critical for VAE latent stability
-                enhanced_genre = f"{genre}, [110 BPM, warm analog tone, 1970s studio recording, vintage tube compression, mid-forward presence, thick organic bass, no digital hiss, smooth high-frequency roll-off]"
-                cmd.extend(["--ref-prompt", enhanced_genre])
-            
-            print(f"Executing 'Pure-Tone' elite production...")
-            result = subprocess.run(
+            process = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                cwd="/root/DiffRhythm",
-                env={**os.environ, "PYTHONPATH": "/root/DiffRhythm"}
+                cwd="/root/YuE/inference",
+                env={**os.environ, "PYTHONPATH": "/root/YuE:/root/X-Codec2"}
             )
             
-            if result.returncode != 0:
-                print(f"STDERR: {result.stderr}")
-                raise RuntimeError(f"DiffRhythm failed: {result.stderr}")
-            
-            # PICK ONLY FROM output_dir (Avoid picking references)
-            generated_files = list(output_dir.glob("*.wav"))
-            if not generated_files:
-                raise RuntimeError("No output file generated in output directory")
-            
-            with open(generated_files[0], "rb") as f:
-                audio_bytes = f.read()
-        print(f"✅ Generation Completed (Size: {len(audio_bytes)/1024/1024:.2f} MB)")
-        return audio_bytes
+            if process.returncode != 0:
+                print(f"❌ YuE Failed: {process.stderr}")
+                raise RuntimeError(f"YuE Inference Error: {process.stderr}")
 
-
-def check_url(url: str) -> bool:
-    """Shield: Verify if the URL is accessible before starting GPU generation."""
-    import requests
-    try:
-        response = requests.head(url, timeout=5)
-        return response.status_code == 200
-    except Exception:
-        return False
-
-
-def get_lyrics_from_data(data: dict) -> str:
-    """Helper to extract lyrics from either 'lyrics' or 'structure' field."""
-    lyrics_text = data.get("lyrics", "")
-    structure = data.get("structure", [])
-    
-    if structure:
-        lrc_lines = []
-        for section in structure:
-            start_str = section.get("start", "00:00.00")
-            time_match = re.search(r'(\d{2}):(\d{2}\.\d{2})', start_str)
-            
-            if time_match:
-                base_min = int(time_match.group(1))
-                base_sec = float(time_match.group(2))
-                base_total = base_min * 60 + base_sec
+            # Collect output
+            output_files = list(output_dir.glob("*.mp3")) or list(output_dir.glob("*.wav"))
+            if not output_files:
+                raise RuntimeError("YuE did not generate any audio files.")
                 
-                lines = section.get("lines", [])
-                for i, line in enumerate(lines):
-                    # Auto-distribute lines with 4s gap
-                    line_total = base_total + (i * 4.0)
-                    m = int(line_total // 60)
-                    s = line_total % 60
-                    ts = f"[{m:02d}:{s:05.2f}] "
-                    lrc_lines.append(f"{ts}{line.strip()}")
-        return "\n".join(lrc_lines)
-    return lyrics_text
+            with open(output_files[0], "rb") as f:
+                return f.read()
 
+    def _process_lyrics(self, raw_lyrics: str) -> str:
+        """
+        Convert timestamped LRC or plain text to YuE format.
+        YuE format: 
+        [verse]
+        Lyric lines...
+        [chorus]
+        Lyric lines...
+        """
+        # Remove timestamps if present
+        clean = re.sub(r'\[\d{2}:\d{2}\.\d{2}\]', '', raw_lyrics)
+        
+        # Ensure section tags are lowercase and bracketed
+        clean = re.sub(r'(Verse|Chorus|Intro|Outro|Bridge)', r'[\1]', clean, flags=re.IGNORECASE)
+        clean = clean.lower()
+        
+        return clean.strip()
 
-@app.function(image=image, timeout=600)
-def process_request(request_data: dict) -> bytes:
-    """Process lyrics-to-song request with URL Shield."""
-    try:
-        # Extract parameters
-        lyrics = get_lyrics_from_data(request_data)
-        genre = request_data.get("genre", "rock")
-        duration = request_data.get("duration", 95)
-        ref_urls = request_data.get("ref_audio_urls", [])
-        
-        # URL Shield: Prevent execution if any reference URL is broken
-        for url in ref_urls:
-            print(f"Checking URL Shield: {url}")
-            if not check_url(url):
-                raise ValueError(f"CRITICAL: Reference URL is broken or inaccessible: {url}. Generation aborted.")
-        
-        if not lyrics:
-            raise ValueError("No lyrics or structure provided")
-        
-        # Duration normalization
-        duration = 285 if duration > 95 else 95
-        
-        # Generator call
-        generator = DiffRhythmGenerator()
-        return generator.generate.remote(
-            lyrics=lyrics,
-            genre=genre,
-            duration=duration,
-            ref_audio_urls=ref_urls,
-        )
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
+@app.function(image=yue_image, timeout=300)
+def process_request(data: dict):
+    """
+    Gateway function for processing requests.
+    """
+    lyrics = data.get("lyrics")
+    # If using structure format, convert it
+    if "structure" in data and not lyrics:
+        lyrics = ""
+        for section in data["structure"]:
+            lyrics += f"\n[{section['type']}]\n"
+            lyrics += "\n".join(section["lines"])
+    
+    genre = data.get("genre", "rock")
+    duration = data.get("duration", 95)
+    ref_audio_urls = data.get("ref_audio_urls", [])
 
-
-@app.local_entrypoint()
-def main():
-    """Local test suite."""
-    test_request = {
-        "request_id": "test_local_01",
-        "genre": "indie rock",
-        "duration": 95,
-        "structure": [
-            {
-                "type": "verse",
-                "start": "00:05.00",
-                "lines": ["The neon lights are fading fast", "Memory of a love that didn't last"]
-            }
-        ]
-    }
-    print("🎵 Testing optimized system...")
-    audio_bytes = process_request.remote(test_request)
-    Path("output").mkdir(exist_ok=True)
-    with open("output/test_local.wav", "wb") as f:
-        f.write(audio_bytes)
-    print("✅ Completed local test")
+    gen = YuEGenerator()
+    audio_bytes = gen.generate.remote(
+        lyrics=lyrics,
+        genre=genre,
+        duration=duration,
+        ref_audio_urls=ref_audio_urls
+    )
+    
+    return audio_bytes

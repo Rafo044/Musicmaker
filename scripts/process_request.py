@@ -22,7 +22,7 @@ def process_request(json_file: str):
     print(f"Genre: {request_data.get('genre', 'rock')}")
     
     # Get Modal function (new API)
-    process_fn = modal.Function.from_name("musicmaker-diffrhythm", "process_request")
+    process_fn = modal.Function.from_name("musicmaker-yue", "process_request")
     
     # Call Modal function (returns audio bytes)
     print("🎤 Generating song with vocals...")

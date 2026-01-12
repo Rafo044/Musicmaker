@@ -37,27 +37,39 @@ def dry_run_test(json_file: str):
         print(f"Step 2 FAILED: {e}")
         return False
     
-    # Validate LRC
+    # Validate Lyrics/Structure
     try:
         import re
-        lyrics = data.get('lyrics', '')
-        lines = lyrics.split('\n')
+        lyrics = data.get('lyrics')
+        structure = data.get('structure')
         
-        errors = []
-        for i, line in enumerate(lines, 1):
-            line = line.strip()
-            if not line:
-                errors.append(f"Line {i}: Empty line")
-            elif not line.startswith('['):
-                errors.append(f"Line {i}: No timestamp")
-        
-        if errors:
-            print(f"Step 3 FAILED: LRC errors:")
-            for err in errors[:5]:
-                print(f"   - {err}")
+        if lyrics:
+            print("Step 3: Validating LRC format...")
+            lines = lyrics.split('\n')
+            errors = []
+            for i, line in enumerate(lines, 1):
+                line = line.strip()
+                if not line:
+                    continue # Allow empty lines in lyrics
+                if not line.startswith('['):
+                    errors.append(f"Line {i}: No timestamp")
+            
+            if errors:
+                print(f"Step 3 FAILED: LRC errors:")
+                for err in errors[:5]:
+                    print(f"   - {err}")
+                return False
+            print("Step 3: LRC format valid")
+        elif structure:
+            print(f"Step 3: Validating structure ({len(structure)} sections)...")
+            for i, section in enumerate(structure):
+                if not section.get('type') or not section.get('lines'):
+                    print(f"   - Section {i} missing type or lines")
+                    return False
+            print("Step 3: Structure format valid")
+        else:
+            print("Step 3 FAILED: Missing both 'lyrics' and 'structure'")
             return False
-        
-        print("Step 3: LRC format valid")
     except Exception as e:
         print(f"Step 3 FAILED: {e}")
         return False
@@ -66,31 +78,36 @@ def dry_run_test(json_file: str):
     try:
         request_id = data.get('request_id')
         lyrics = data.get('lyrics')
+        structure = data.get('structure')
         genre = data.get('genre', 'rock')
         duration = data.get('duration', 95)
         
         if not request_id:
             raise ValueError("Missing request_id")
-        if not lyrics:
-            raise ValueError("Missing lyrics")
-        if duration not in [95, 285]:
-            raise ValueError(f"Invalid duration: {duration} (must be 95 or 285)")
+        if not lyrics and not structure:
+            raise ValueError("Missing lyrics/structure")
+        if duration < 30 or duration > 600:
+            raise ValueError(f"Invalid duration: {duration} (YuE recommended range 30-300s)")
         
         print("Step 4: Required fields present")
         print(f"   - Request ID: {request_id}")
         print(f"   - Genre: {genre}")
         print(f"   - Duration: {duration}s")
-        print(f"   - Lyrics length: {len(lyrics)} chars")
+        if lyrics:
+            print(f"   - Lyrics length: {len(lyrics)} chars")
+        if structure:
+            total_lines = sum(len(s['lines']) for s in structure)
+            print(f"   - Structure: {len(structure)} sections, {total_lines} lines")
     except Exception as e:
         print(f"Step 4 FAILED: {e}")
         return False
     
     # Simulate Modal deployment (without actually deploying)
     print("Step 5: Modal deployment (simulated)")
-    print("   - Would deploy to: musicmaker-diffrhythm")
-    print("   - GPU: A10G (24GB)")
-    print("   - Estimated time: 2-3 minutes")
-    print("   - Estimated cost: ~$0.03")
+    print("   - Would deploy to: musicmaker-yue")
+    print("   - GPU: A100-40GB (YuE High-Fidelity Stage)")
+    print("   - Estimated time: 6-10 minutes (Dual-Stage Generation)")
+    print("   - Estimated cost: ~$0.50 - $0.80")
     
     # Simulate video creation
     print("Step 6: Video creation (simulated)")

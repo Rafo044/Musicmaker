@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "DiffRhythm Music Generation Request",
-  "description": "Schema for lyrics-to-song generation with DiffRhythm - ONE JSON = ONE SONG WITH VOCALS",
+  "title": "YuE Music Generation Request",
+  "description": "Schema for lyrics-to-song generation with YuE - Foundation Music Model",
   "type": "object",
   "anyOf": [
     {
@@ -63,8 +63,8 @@
     },
     "duration": {
       "type": "integer",
-      "description": "Target duration (95s or 285s)",
-      "default": 95
+      "description": "Target duration (30s to 600s)",
+      "default": 180
     },
     "ref_audio_urls": {
       "type": "array",
