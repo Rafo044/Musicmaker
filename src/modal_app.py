@@ -106,11 +106,14 @@ class YuEGenerator:
             output_dir = tmp_root / "output"
             output_dir.mkdir()
 
-            # Prepare YuE Command with explicit PYTHONPATH and absolute paths
-            # Using bash -c to ensure environment variables are correctly inherited in the shell context
+            # PATCH: Forcefully add YuE root to sys.path inside the script itself to prevent ModuleNotFoundError
+            patch_cmd = "sed -i '1i import sys, os; sys.path.insert(0, \"/root/YuE\")' /root/YuE/inference/infer.py"
+            subprocess.run(["bash", "-c", patch_cmd], check=True)
+
+            # Prepare YuE Command with explicit absolute paths
             infer_script = "/root/YuE/inference/infer.py"
             
-            bash_cmd = f"export PYTHONPATH=$PYTHONPATH:/root/YuE && python3 {infer_script} " \
+            bash_cmd = f"python3 {infer_script} " \
                        f"--stage1_model {self.s1_path} " \
                        f"--stage2_model {self.s2_path} " \
                        f"--genre_txt {genre_file} " \
@@ -120,7 +123,7 @@ class YuEGenerator:
                        f"--cuda_idx 0 " \
                        f"--max_new_tokens 3000"
 
-            print(f"Running command: {bash_cmd}")
+            print(f"🚀 Executing Patched YuE Engine: {bash_cmd}")
             
             process = subprocess.run(
                 ["bash", "-c", bash_cmd],
