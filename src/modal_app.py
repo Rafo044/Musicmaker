@@ -37,7 +37,18 @@ yue_image = (
         "wheel",
         "ninja",
         "packaging",
-        "tensorboard", # Missing dependency required by xcodec_mini_infer utils
+        "omegaconf",
+        "einops",
+        "transformers",
+        "sentencepiece",
+        "tqdm",
+        "tensorboard",
+        "matplotlib",
+        "PyYAML",
+        "scipy",
+        "accelerate>=0.26.0",
+        "descript-audiotools>=0.7.2",
+        "descript-audio-codec",
     )
     # Install flash-attn with proper build context
     .run_commands(
