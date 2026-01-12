@@ -33,9 +33,12 @@ yue_image = (
         "pyyaml",
         "jsonschema",
         "requests",
-        "xcodec2", # Install via pip instead of cloning
+        "xcodec2",
+        "wheel",      # Required for flash-attn build
+        "ninja",      # Highly recommended for flash-attn
+        "packaging",  # Required for flash-attn
     )
-    # Install flash-attn using recommended wheel for CUDA 12.1
+    # Install flash-attn with proper build context
     .run_commands(
         "pip install flash-attn --no-build-isolation"
     )
