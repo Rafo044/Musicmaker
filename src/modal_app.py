@@ -42,11 +42,12 @@ yue_image = (
     .run_commands(
         "pip install flash-attn --no-build-isolation"
     )
-    # Clone YuE repository with terminal prompt disabled
+    # Clone YuE repository and its essential submodule (xcodec_mini_infer)
     .run_commands(
         "GIT_TERMINAL_PROMPT=0 git clone https://github.com/multimodal-art-projection/YuE.git /root/YuE",
-        # PERMANENT PATCH: Insert library path at build time
-        "sed -i '1i import sys; sys.path.insert(0, \"/root/YuE\")' /root/YuE/inference/infer.py"
+        # ESSENTIAL: xcodec_mini_infer is where the 'models' folder lives. 
+        # Standard clone misses it, so we manually put it where infer.py expects it.
+        "GIT_TERMINAL_PROMPT=0 git clone https://huggingface.co/m-a-p/xcodec_mini_infer /root/YuE/inference/xcodec_mini_infer"
     )
 )
 
@@ -108,15 +109,10 @@ class YuEGenerator:
             output_dir = tmp_root / "output"
             output_dir.mkdir()
 
-            # Debug: List YuE directory to verify structure
-            print("--- YuE Directory Structure ---")
-            subprocess.run(["ls", "-F", "/root/YuE"], check=False)
-            print("--- inference/ Directory Content ---")
-            subprocess.run(["ls", "-F", "/root/YuE/inference"], check=False)
-
             # Prepare YuE Command
             infer_script = "/root/YuE/inference/infer.py"
             
+            # YuE adds 'xcodec_mini_infer' to path automatically in infer.py
             bash_cmd = f"python3 {infer_script} " \
                        f"--stage1_model {self.s1_path} " \
                        f"--stage2_model {self.s2_path} " \
@@ -133,7 +129,7 @@ class YuEGenerator:
                 ["bash", "-c", bash_cmd],
                 capture_output=True,
                 text=True,
-                cwd="/root/YuE"
+                cwd="/root/YuE/inference" # Run from inference dir where infer.py lives
             )
             
             if process.returncode != 0:
