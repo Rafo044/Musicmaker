@@ -34,9 +34,10 @@ yue_image = (
         "jsonschema",
         "requests",
         "xcodec2",
-        "wheel",      # Required for flash-attn build
-        "ninja",      # Highly recommended for flash-attn
-        "packaging",  # Required for flash-attn
+        "wheel",
+        "ninja",
+        "packaging",
+        "tensorboard", # Missing dependency required by xcodec_mini_infer utils
     )
     # Install flash-attn with proper build context
     .run_commands(
