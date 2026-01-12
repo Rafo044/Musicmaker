@@ -134,17 +134,20 @@ class DiffRhythmGenerator:
 
             # PATCH: Apply Research-Backed 'Pure-Tone' Values (Fixing Hum & Clipping)
             print("Applying Pure-Tone patches (Fixing Ugultu & Clipping)...")
-            # 1. Bump steps to 50 for elite denoising
-            subprocess.run(["sed", "-i", "s/steps=45/steps=50/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/steps=32/steps=50/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            # 1. Bump steps to 100 for maximum fidelity (Research suggests 50-100)
+            subprocess.run(["sed", "-i", "s/steps=45/steps=100/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            subprocess.run(["sed", "-i", "s/steps=32/steps=100/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            subprocess.run(["sed", "-i", "s/steps=50/steps=100/g", "/root/DiffRhythm/infer/infer.py"], check=False)
             
-            # 2. Relax CFG to 5.8 for natural vocal smoothness (removes 'metallic' stress)
-            subprocess.run(["sed", "-i", "s/cfg_strength=6.2/cfg_strength=5.8/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/cfg_strength=4.0/cfg_strength=5.8/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            # 2. Optimal CFG Scale = 9.0 for structure and adherence (Research suggests 7-12)
+            # Replaces default low values with 9.0 for tighter "Suno-like" structure
+            subprocess.run(["sed", "-i", "s/cfg_strength=6.2/cfg_strength=9.0/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            subprocess.run(["sed", "-i", "s/cfg_strength=4.0/cfg_strength=9.0/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            subprocess.run(["sed", "-i", "s/cfg_strength=5.8/cfg_strength=9.0/g", "/root/DiffRhythm/infer/infer.py"], check=False)
             
-            # 3. Aggressive Headroom (0.88) to kill EVERY single pop/click
+            # 3. Headroom Management (0.85) to prevent clipping
             subprocess.run(["sed", "-i", "s/.mul(0.95)//g", "/root/DiffRhythm/infer/infer.py"], check=False) # Clean old if exists
-            subprocess.run(["sed", "-i", "s/.div(torch.max(torch.abs(output)))/.div(torch.max(torch.abs(output))).mul(0.88)/g", "/root/DiffRhythm/infer/infer.py"], check=True)
+            subprocess.run(["sed", "-i", "s/.div(torch.max(torch.abs(output)))/.div(torch.max(torch.abs(output))).mul(0.85)/g", "/root/DiffRhythm/infer/infer.py"], check=True)
 
             # Prepare DiffRhythm Command
             cmd = [
@@ -162,7 +165,7 @@ class DiffRhythmGenerator:
                 cmd.extend(["--ref-audio-path", str(target_ref)])
             else:
                 # Elite engineering for dry/clear vocals
-                enhanced_genre = f"{genre}, [very clear vocals, studio dry, high fidelity, 44.1kHz]"
+                enhanced_genre = f"{genre}, [masterpiece, top hit, high fidelity, 48kHz, professionally mastered, crisp vocals, studio quality, dynamic range]"
                 cmd.extend(["--ref-prompt", enhanced_genre])
             
             print(f"Executing 'Pure-Tone' elite production...")
