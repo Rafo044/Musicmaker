@@ -50,14 +50,13 @@ yue_image = (
 
 @app.cls(
     image=yue_image,
-    gpu="A100", # YuE-s1-7B requires A100 for high-context or fast inference
+    gpu="A100", 
     volumes={"/models": volume},
-    timeout=1200, # YuE generation is slower, allow 20 mins
+    timeout=1200,
 )
 class YuEGenerator:
-    def __init__(self):
-        self.s1_path = Path("/models/s1")
-        self.s2_path = Path("/models/s2")
+    s1_path: Path = Path("/models/s1")
+    s2_path: Path = Path("/models/s2")
 
     @modal.enter()
     def download_models(self):
@@ -127,8 +126,8 @@ class YuEGenerator:
                 cmd,
                 capture_output=True,
                 text=True,
-                cwd="/root/YuE/inference",
-                env={**os.environ, "PYTHONPATH": "/root/YuE:/root/X-Codec2"}
+                cwd="/root/YuE", # Run from ROOT to avoid 'models' ModuleNotFoundError
+                env={**os.environ, "PYTHONPATH": "/root/YuE"} # Only YuE in path (X-Codec2 is system-installed)
             )
             
             if process.returncode != 0:
