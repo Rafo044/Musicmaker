@@ -33,19 +33,15 @@ yue_image = (
         "pyyaml",
         "jsonschema",
         "requests",
+        "xcodec2", # Install via pip instead of cloning
     )
-    # Install X-Codec2
-    .run_commands(
-        "git clone https://github.com/HKUST-KnowComp/X-Codec2.git /root/X-Codec2",
-        "cd /root/X-Codec2 && pip install -e .",
-    )
-    # Install flash-attn
+    # Install flash-attn using recommended wheel for CUDA 12.1
     .run_commands(
         "pip install flash-attn --no-build-isolation"
     )
-    # Clone YuE repository
+    # Clone YuE repository with terminal prompt disabled
     .run_commands(
-        "git clone https://github.com/multimodal-art-projection/YuE.git /root/YuE"
+        "GIT_TERMINAL_PROMPT=0 git clone https://github.com/multimodal-art-projection/YuE.git /root/YuE"
     )
 )
 
