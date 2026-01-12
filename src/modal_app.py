@@ -39,13 +39,16 @@ yue_image = (
         "packaging",
         "omegaconf",
         "einops",
-        "transformers",
+        "transformers[audio]>=4.44.0", # Force modern version with audio support
         "sentencepiece",
+        "tokenizers>=0.19.1",
         "tqdm",
         "tensorboard",
         "matplotlib",
         "PyYAML",
         "scipy",
+        "librosa",      # Required for audio feature extraction
+        "soundfile",    # Required for reading/writing audio files
         "accelerate>=0.26.0",
         "descript-audiotools>=0.7.2",
         "descript-audio-codec",
