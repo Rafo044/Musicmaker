@@ -44,7 +44,9 @@ yue_image = (
     )
     # Clone YuE repository with terminal prompt disabled
     .run_commands(
-        "GIT_TERMINAL_PROMPT=0 git clone https://github.com/multimodal-art-projection/YuE.git /root/YuE"
+        "GIT_TERMINAL_PROMPT=0 git clone https://github.com/multimodal-art-projection/YuE.git /root/YuE",
+        # PERMANENT PATCH: Insert library path at build time
+        "sed -i '1i import sys; sys.path.insert(0, \"/root/YuE\")' /root/YuE/inference/infer.py"
     )
 )
 
@@ -106,11 +108,13 @@ class YuEGenerator:
             output_dir = tmp_root / "output"
             output_dir.mkdir()
 
-            # PATCH: Forcefully add YuE root to sys.path inside the script itself to prevent ModuleNotFoundError
-            patch_cmd = "sed -i '1i import sys, os; sys.path.insert(0, \"/root/YuE\")' /root/YuE/inference/infer.py"
-            subprocess.run(["bash", "-c", patch_cmd], check=True)
+            # Debug: List YuE directory to verify structure
+            print("--- YuE Directory Structure ---")
+            subprocess.run(["ls", "-F", "/root/YuE"], check=False)
+            print("--- inference/ Directory Content ---")
+            subprocess.run(["ls", "-F", "/root/YuE/inference"], check=False)
 
-            # Prepare YuE Command with explicit absolute paths
+            # Prepare YuE Command
             infer_script = "/root/YuE/inference/infer.py"
             
             bash_cmd = f"python3 {infer_script} " \
@@ -123,7 +127,7 @@ class YuEGenerator:
                        f"--cuda_idx 0 " \
                        f"--max_new_tokens 3000"
 
-            print(f"🚀 Executing Patched YuE Engine: {bash_cmd}")
+            print(f"🚀 Executing High-Fidelity YuE Engine: {bash_cmd}")
             
             process = subprocess.run(
                 ["bash", "-c", bash_cmd],
