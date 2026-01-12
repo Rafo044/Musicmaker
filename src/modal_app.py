@@ -20,26 +20,25 @@ volume = modal.Volume.from_name("yue-models", create_if_missing=True)
 # Docker Image setup with YuE dependencies
 yue_image = (
     modal.Image.from_registry("nvidia/cuda:12.1.0-devel-ubuntu22.04", add_python="3.10")
-    .apt_install("git", "ffmpeg")
+    .apt_install("git", "ffmpeg", "libsndfile1")
+    # Layer 1: Heavy AI Core (Cached separately)
     .pip_install(
         "torch",
-        "transformers",
-        "accelerate",
-        "sentencepiece",
-        "einops",
-        "omegaconf",
-        "librosa",
-        "soundfile",
-        "pyyaml",
-        "jsonschema",
-        "requests",
-        "xcodec2",
+        "torchaudio",
+        "transformers[audio]>=4.44.0",
+        "accelerate>=0.26.0",
+    )
+    # Layer 2: Build tools & Core YuE dependencies
+    .pip_install(
         "wheel",
         "ninja",
         "packaging",
+        "xcodec2",
+    )
+    # Layer 3: Auxiliary dependencies (Audio processing, logging, etc.)
+    .pip_install(
         "omegaconf",
         "einops",
-        "transformers[audio]>=4.44.0", # Force modern version with audio support
         "sentencepiece",
         "tokenizers>=0.19.1",
         "tqdm",
@@ -47,21 +46,21 @@ yue_image = (
         "matplotlib",
         "PyYAML",
         "scipy",
-        "librosa",      # Required for audio feature extraction
-        "soundfile",    # Required for reading/writing audio files
-        "accelerate>=0.26.0",
+        "librosa",
+        "soundfile",
         "descript-audiotools>=0.7.2",
         "descript-audio-codec",
+        "pydantic",
+        "jsonschema",
+        "requests",
     )
-    # Install flash-attn with proper build context
+    # Layer 4: Custom compilation
     .run_commands(
         "pip install flash-attn --no-build-isolation"
     )
-    # Clone YuE repository and its essential submodule (xcodec_mini_infer)
+    # Layer 5: YuE Repositories
     .run_commands(
         "GIT_TERMINAL_PROMPT=0 git clone https://github.com/multimodal-art-projection/YuE.git /root/YuE",
-        # ESSENTIAL: xcodec_mini_infer is where the 'models' folder lives. 
-        # Standard clone misses it, so we manually put it where infer.py expects it.
         "GIT_TERMINAL_PROMPT=0 git clone https://huggingface.co/m-a-p/xcodec_mini_infer /root/YuE/inference/xcodec_mini_infer"
     )
 )
