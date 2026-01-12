@@ -139,11 +139,11 @@ class DiffRhythmGenerator:
             subprocess.run(["sed", "-i", "s/steps=32/steps=100/g", "/root/DiffRhythm/infer/infer.py"], check=False)
             subprocess.run(["sed", "-i", "s/steps=50/steps=100/g", "/root/DiffRhythm/infer/infer.py"], check=False)
             
-            # 2. Optimal CFG Scale = 9.0 for structure and adherence (Research suggests 7-12)
-            # Replaces default low values with 9.0 for tighter "Suno-like" structure
-            subprocess.run(["sed", "-i", "s/cfg_strength=6.2/cfg_strength=9.0/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/cfg_strength=4.0/cfg_strength=9.0/g", "/root/DiffRhythm/infer/infer.py"], check=False)
-            subprocess.run(["sed", "-i", "s/cfg_strength=5.8/cfg_strength=9.0/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            # 2. Optimal CFG Scale = 8.0 (Benchmarked against real music: 9.0 was too harsh/digital)
+            subprocess.run(["sed", "-i", "s/cfg_strength=6.2/cfg_strength=8.0/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            subprocess.run(["sed", "-i", "s/cfg_strength=4.0/cfg_strength=8.0/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            subprocess.run(["sed", "-i", "s/cfg_strength=9.0/cfg_strength=8.0/g", "/root/DiffRhythm/infer/infer.py"], check=False)
+            subprocess.run(["sed", "-i", "s/cfg_strength=5.8/cfg_strength=8.0/g", "/root/DiffRhythm/infer/infer.py"], check=False)
             
             # 3. Headroom Management (0.85) to prevent clipping
             subprocess.run(["sed", "-i", "s/.mul(0.95)//g", "/root/DiffRhythm/infer/infer.py"], check=False) # Clean old if exists
@@ -164,8 +164,8 @@ class DiffRhythmGenerator:
                 print(f"Using PRIMARY reference for pure timbre: {ref_audio_urls[0]}")
                 cmd.extend(["--ref-audio-path", str(target_ref)])
             else:
-                # Elite engineering for dry/clear vocals
-                enhanced_genre = f"{genre}, [masterpiece, top hit, high fidelity, 48kHz, professionally mastered, crisp vocals, studio quality, dynamic range]"
+                # Elite benchmarked production: Targeting 2900Hz brightness and analog warmth
+                enhanced_genre = f"{genre}, [masterpiece, high fidelity, 48kHz, warm mid-range, vintage tube saturation, deep analog richness, vocals tucked into the mix, professional garage rock mastering, smooth transients]"
                 cmd.extend(["--ref-prompt", enhanced_genre])
             
             print(f"Executing 'Pure-Tone' elite production...")
