@@ -106,28 +106,27 @@ class YuEGenerator:
             output_dir = tmp_root / "output"
             output_dir.mkdir()
 
-            # YuE Inference Command logic
-            # Stage 1 + Stage 2 combined usually in infer.py
-            print("🚀 Starting YuE Dual-Stage Inference...")
+            # Prepare YuE Command with explicit PYTHONPATH and absolute paths
+            # Using bash -c to ensure environment variables are correctly inherited in the shell context
+            infer_script = "/root/YuE/inference/infer.py"
             
-            cmd = [
-                "python3", "/root/YuE/inference/infer.py",
-                "--stage1_model", str(self.s1_path),
-                "--stage2_model", str(self.s2_path),
-                "--genre_txt", str(genre_file),
-                "--lyrics_txt", str(lyrics_file),
-                "--run_n_segments", "2", # Default to 2 segments for testing
-                "--output_dir", str(output_dir),
-                "--cuda_idx", "0",
-                "--max_new_tokens", "3000"
-            ]
+            bash_cmd = f"export PYTHONPATH=$PYTHONPATH:/root/YuE && python3 {infer_script} " \
+                       f"--stage1_model {self.s1_path} " \
+                       f"--stage2_model {self.s2_path} " \
+                       f"--genre_txt {genre_file} " \
+                       f"--lyrics_txt {lyrics_file} " \
+                       f"--run_n_segments 2 " \
+                       f"--output_dir {output_dir} " \
+                       f"--cuda_idx 0 " \
+                       f"--max_new_tokens 3000"
 
+            print(f"Running command: {bash_cmd}")
+            
             process = subprocess.run(
-                cmd,
+                ["bash", "-c", bash_cmd],
                 capture_output=True,
                 text=True,
-                cwd="/root/YuE", # Run from ROOT to avoid 'models' ModuleNotFoundError
-                env={**os.environ, "PYTHONPATH": "/root/YuE"} # Only YuE in path (X-Codec2 is system-installed)
+                cwd="/root/YuE"
             )
             
             if process.returncode != 0:
