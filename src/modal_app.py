@@ -20,7 +20,17 @@ volume = modal.Volume.from_name("yue-models", create_if_missing=True)
 # Docker Image setup with YuE dependencies
 yue_image = (
     modal.Image.from_registry("nvidia/cuda:12.1.0-devel-ubuntu22.04", add_python="3.10")
-    .apt_install("git", "ffmpeg", "libsndfile1")
+    .apt_install(
+        "git", 
+        "ffmpeg", 
+        "libsndfile1", 
+        "build-essential", 
+        "clang", 
+        "cmake",
+        "zlib1g-dev",
+        "libbz2-dev",
+        "liblzma-dev"
+    )
     # Layer 1: Heavy AI Core (Cached separately)
     .pip_install(
         "torch",
